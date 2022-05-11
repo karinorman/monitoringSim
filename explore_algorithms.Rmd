@@ -1,0 +1,127 @@
+---
+title: "Algorithms"
+output: html_document
+date: '2022-05-10'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(sampling)
+library(survey)
+library(dplyr)
+
+#number of sites
+n <- 100
+#number of possible sites
+N <- 1000
+
+set.seed(12412)
+
+simdf <- data.frame(id = 1:N, x = runif(N), y = runif(N))
+yobs <- (exp((simdf$x-0.5)^2)+exp((simdf$y-0.5)^2))
+yobs <- 100-((yobs-min(yobs))/(max(yobs-min(yobs))))*100+
++ (rnorm(N)+5)*5
+ypps <- exp(yobs/10)
+q1obs <- sample(1:3,N,replace = TRUE)
+q2obs <- sample(LETTERS[1:2], N, replace = TRUE)
+simdf <- cbind(simdf,yobs,ypps,q1obs,q2obs)
+```
+
+# GRST Sampling
+Using the vingette example https://cran.r-project.org/web/packages/spsurvey/vignettes/sampling.html
+```{r}
+library("spsurvey")
+
+simdf_sf <- st_as_sf(simdf, coords = c("x", "y"), crs = 4326)
+simdf_sf <- st_transform(simdf_sf, crs = 5070)
+
+#grts sample where all sites have equal probability of selection
+eqprob <- grts(simdf_sf, n_base = n)
+
+#plot against possible sites
+sp_plot(eqprob, simdf_sf, key.width = lcm(3))
+```
+
+Unequal probabilites based on a categorical variable (diff sample number between categories).
+```{r}
+#named vector of sample sizes for categories
+caty_n <- c("1" = 30, "2" = 10, "3" = 10)
+
+uneqprob <- grts(
+  simdf_sf %>% mutate(q1obs = as.character(q1obs)),
+  n_base = 50,
+  caty_var = "q1obs",
+  caty_n = caty_n
+)
+
+sp_plot(uneqprob, simdf_sf, key.width = lcm(3))
+```
+
+Inclusion probability proportional to a continuous variable
+```{r}
+propprob <- grts(
+  simdf_sf,
+  n_base = 50,
+  aux_var = "ypps"
+)
+
+sp_plot(propprob, simdf_sf, key.width = lcm(3))
+```
+## Stratification
+
+Equal inclusion probabilities within stratum
+```{r}
+strata_n <- c(A = 25, B = 15)
+strat_eqprob <- grts(simdf_sf, n_base = strata_n, stratum_var = "q2obs")
+
+#plots broken down by strata
+sp_plot(
+  strat_eqprob,
+  formula = siteuse ~ q2obs,
+  simdf_sf,
+  key.width = lcm(3)
+)
+```
+Unqeual inclusion probabilities within stratum
+```{r}
+caty_n <- list(
+  A = c("1" = 15, "2" = 5, "3" = 5),
+  B = c("1" = 7, "2" = 5, "3" = 3)
+)
+
+strat_uneqprob <- grts(
+  simdf_sf,
+  n_base = strata_n,
+  stratum_var = "q2obs",
+  caty_var = "q1obs",
+  caty_n = caty_n
+)
+```
+
+Probablities within strata proportional to continuous variable
+```{r}
+strat_propprob <- grts(
+  simdf_sf,
+  n_base = strata_n,
+  stratum_var = "q2obs", #stratification categorical variable
+  aux_var = "ypps" #continuous variable 
+)
+```
+
+
+# Cube Sampling
+```{r}
+#number of sites
+n <- 100
+#number of possible sites
+N <- 1000
+
+par(mar = c(1,1,1,1), xaxs = "i",yaxs = "i")
+>plot(framepop$xc,framepop$yc, axes¼F,cex¼0.5,pch¼19,
++ xlim¼c(0,1),ylim¼c(0,1))
+>box()
+```
+
