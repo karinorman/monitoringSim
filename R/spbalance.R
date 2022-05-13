@@ -10,13 +10,13 @@
 #' @return Returns the value of the spatial balance metric.
 #'
 spbalance <- function(dist_mat, pik, samp_index) {
-  N = length(pi)
-  n = length(samp)
+  N = length(pik)
+  n = length(samp_index)
   index = 1:N
   incl = rep(0,n)
   for(i in 1:N) {
-    near <- which(diss[i,samp] == min(diss[i,samp]))
-    incl[near] = incl[near] + pi[i]
+    near <- which(dist_mat[i,samp_index] == min(dist_mat[i,samp_index]))
+    incl[near] = incl[near] + pik[i]
   }
   var(incl)
 }

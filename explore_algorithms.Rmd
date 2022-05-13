@@ -29,6 +29,9 @@ ypps <- exp(yobs/10) #continuous variable
 q1obs <- sample(1:3,N,replace = TRUE) #categorical variable
 q2obs <- sample(LETTERS[1:2], N, replace = TRUE) #categorical variable
 simdf <- cbind(simdf,yobs,ypps,q1obs,q2obs)
+
+#distance matrix for candidate sites
+dist_mat <- as.matrix(dist(simdf %>% select(x, y)))
 ```
 
 # GRST Sampling
@@ -41,7 +44,7 @@ simdf_sf <- st_transform(simdf_sf, crs = 5070)
 
 #grts sample where all sites have equal probability of selection
 eqprob <- grts(simdf_sf, n_base = n)
-spbalance()
+spbalance(dist_mat, rep(n/N,N), eqprob$sites_base$id)
 
 #plot against possible sites
 sp_plot(eqprob, simdf_sf, key.width = lcm(3))
@@ -140,9 +143,7 @@ pik <- rep(n/N,N) #vector of inclusion probabilities
 x <- as.matrix(cbind(simdf$x,simdf$y))
 bal <- samplecube(x,pik,comment=TRUE,method=1)
 
-framebal <- simdf[bal==1,]
-ds <- as.matrix(dist(simdf %>% select(x, y)))
-spbalance(ds,rep(n/N,N),(1:1000)[bal==1])
+spbalance(dist_mat,rep(n/N,N),(1:1000)[bal==1])
 
 ## BalancedSampling version
 bal_bs <- BalancedSampling::cube(pik,x)
@@ -162,7 +163,7 @@ x <- cbind(simdf$x,simdf$y)
 sam_scps <- scps(p,X)
 length(sam_scps)
 
-spbalance(ds,rep(n/N,N),sam_scps)
+spbalance(dist_mat,rep(n/N,N),sam_scps)
 
 par(mar = c(1,1,1,1), xaxs = "i",yaxs = "i")
 plot(simdf$x,simdf$y, axes=F,cex=0.5,pch=19, xlim=c(0,1),ylim=c(0,1))
@@ -180,10 +181,10 @@ p <- rep(n/N,N)
 x <- cbind(simdf$x,simdf$y)
 
 sam_lpm1 <- lpm1(p,X)
-spbalance(ds,rep(n/N,N),sam_lpm1)
+spbalance(dist_mat,rep(n/N,N),sam_lpm1)
 
 sam_lpm2 <- lpm2(p,X)
-spbalance(ds,rep(n/N,N),sam_lpm2)
+spbalance(dist_mat,rep(n/N,N),sam_lpm2)
 ```
 # Balanced acceptance sampling (BAS)
 
