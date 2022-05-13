@@ -8,6 +8,7 @@ date: '2022-05-10'
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Simulation Setup
 ```{r}
 library(sampling)
 library(survey)
@@ -24,22 +25,23 @@ simdf <- data.frame(id = 1:N, x = runif(N), y = runif(N))
 yobs <- (exp((simdf$x-0.5)^2)+exp((simdf$y-0.5)^2))
 yobs <- 100-((yobs-min(yobs))/(max(yobs-min(yobs))))*100+
 + (rnorm(N)+5)*5
-ypps <- exp(yobs/10)
-q1obs <- sample(1:3,N,replace = TRUE)
-q2obs <- sample(LETTERS[1:2], N, replace = TRUE)
+ypps <- exp(yobs/10) #continuous variable
+q1obs <- sample(1:3,N,replace = TRUE) #categorical variable
+q2obs <- sample(LETTERS[1:2], N, replace = TRUE) #categorical variable
 simdf <- cbind(simdf,yobs,ypps,q1obs,q2obs)
 ```
 
 # GRST Sampling
 Using the vingette example https://cran.r-project.org/web/packages/spsurvey/vignettes/sampling.html
 ```{r}
-library("spsurvey")
+library(spsurvey)
 
 simdf_sf <- st_as_sf(simdf, coords = c("x", "y"), crs = 4326)
 simdf_sf <- st_transform(simdf_sf, crs = 5070)
 
 #grts sample where all sites have equal probability of selection
 eqprob <- grts(simdf_sf, n_base = n)
+spbalance()
 
 #plot against possible sites
 sp_plot(eqprob, simdf_sf, key.width = lcm(3))
@@ -101,7 +103,7 @@ strat_uneqprob <- grts(
 )
 ```
 
-Probablities within strata proportional to continuous variable
+Probabilities within strata proportional to continuous variable
 ```{r}
 strat_propprob <- grts(
   simdf_sf,
@@ -111,17 +113,90 @@ strat_propprob <- grts(
 )
 ```
 
+Potential spatial balance metric? from Benedetti 2015 ch 7
+```{r}
+
+```
 
 # Cube Sampling
+Sample sizes is random and not fixed
+- include a first-order inclusion probability vector when balancing the auxiliary variables in order to enforce a sample size
+
+Using `spsurvey::samplecube()` here, but there's also `BalancedSampling::cube()`
 ```{r}
 #number of sites
 n <- 100
 #number of possible sites
 N <- 1000
 
+#plot potential sites
 par(mar = c(1,1,1,1), xaxs = "i",yaxs = "i")
->plot(framepop$xc,framepop$yc, axes¼F,cex¼0.5,pch¼19,
-+ xlim¼c(0,1),ylim¼c(0,1))
->box()
+plot(simdf$x,simdf$y, axes = F,cex = 0.5,pch = 19, xlim = c(0,1), ylim = c(0,1))
+box()
+
+#
+set.seed(200694)
+pik <- rep(n/N,N) #vector of inclusion probabilities
+x <- as.matrix(cbind(simdf$x,simdf$y))
+bal <- samplecube(x,pik,comment=TRUE,method=1)
+
+framebal <- simdf[bal==1,]
+ds <- as.matrix(dist(simdf %>% select(x, y)))
+spbalance(ds,rep(n/N,N),(1:1000)[bal==1])
+
+## BalancedSampling version
+bal_bs <- BalancedSampling::cube(pik,x)
 ```
 
+# Spatially correlated Poisson sampling (SCPS)
+```{r}
+library(BalancedSampling)
+
+n <- 100
+N <- 1000
+set.seed(200694)
+
+p <- rep(n/N,N)
+x <- cbind(simdf$x,simdf$y)
+
+sam_scps <- scps(p,X)
+length(sam_scps)
+
+spbalance(ds,rep(n/N,N),sam_scps)
+
+par(mar = c(1,1,1,1), xaxs = "i",yaxs = "i")
+plot(simdf$x,simdf$y, axes=F,cex=0.5,pch=19, xlim=c(0,1),ylim=c(0,1))
+points(simdf$x[sam_scps],simdf$y[sam_scps],pch=1, cex=2)
+box()
+```
+# Local Pivotal Method
+There are two versions of the algorithm, lpm1 is better balanced, lpm2 is faster
+```{r}
+n <- 100
+N <- 1000
+set.seed(200694)
+
+p <- rep(n/N,N)
+x <- cbind(simdf$x,simdf$y)
+
+sam_lpm1 <- lpm1(p,X)
+spbalance(ds,rep(n/N,N),sam_lpm1)
+
+sam_lpm2 <- lpm2(p,X)
+spbalance(ds,rep(n/N,N),sam_lpm2)
+```
+# Balanced acceptance sampling (BAS)
+
+# Algorithm Characteristics
+
+GRTS `spsurvey::grst`:
+- outputs `spdesign` class
+
+Cube `spsurvey::samplecube`:
+- outputs binary inclusion vector of length N
+
+SCPS `BalancedSampling::scps`:
+- outputs vector of length n of included site indexes
+
+LPM `BalancedSampling::lpm1`
+- - outputs vector of length n of included site indexes
