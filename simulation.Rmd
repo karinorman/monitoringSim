@@ -1,0 +1,77 @@
+---
+title: "Simple Simulation"
+output: html_document
+date: '2022-05-12'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Let's do a little example simulation to build some of the infrastructure
+
+```{r}
+library(dplyr)
+library(monitoringSim)
+library(spsurvey)
+
+devtools::load_all()
+```
+
+This is the simulation example from the Benedetti 2015 textbook
+```{r}
+#number of sites
+n <- 100
+#number of possible sites
+N <- 1000
+
+set.seed(12412)
+
+simdf <- data.frame(id = 1:N, x = runif(N), y = runif(N))
+
+#create survey variable yobs with spatial trend on the coordinates
+yobs <- (exp((simdf$x-0.5)^2)+exp((simdf$y-0.5)^2))
+#add some noise
+yobs <- 100-((yobs-min(yobs))/(max(yobs-min(yobs))))*100+
++ (rnorm(N)+5)*5
+ypps <- exp(yobs/10) #continuous variable
+q1obs <- sample(1:3,N,replace = TRUE) #categorical variable
+q2obs <- sample(LETTERS[1:2], N, replace = TRUE) #categorical variable
+simdf <- cbind(simdf,yobs,ypps,q1obs,q2obs)
+
+#distance matrix for candidate sites
+dist_mat <- as.matrix(dist(simdf %>% select(x, y)))
+
+
+#inclusion probs and df of cooridnates are often inputs
+pik <- rep(n/N,N) #vector of inclusion probabilities
+x <- as.matrix(cbind(simdf$x,simdf$y))
+```
+
+Let's fit equal probability sample using all the algorithms
+```{r}
+# first get spatial df for GRTS function
+simdf_sf <- st_as_sf(simdf, coords = c("x", "y"), crs = 4326)
+simdf_sf <- st_transform(simdf_sf, crs = 5070)
+
+#GRTS 
+grts_eqprob <- grts(simdf_sf, n_base = n)
+
+#Cube sampling
+cube_eqprob <- samplecube(x,pik,comment=TRUE,method=1)
+
+#SCPS
+scps_eqprob <- scps(pik, x)
+
+#LPM
+lpm1_eqprob <- lpm1(pik,x)
+lpm2_eqprob <- lpm2(pik,x)
+
+spbalance(dist_mat, rep(n/N,N), grts_eqprob$sites_base$id)
+
+selected_sites <- list(grts = grts_eqprob$sites_base$id, cube = (1:1000)[cube_eqprob==1],
+                       scps = scps_eqprob, lpm1 = lpm1_eqprob, lpm2 = lpm2_eqprob)
+
+purrr::map_df(selected_sites, spbalance, dist_mat = dist_mat, pik = pik)
+```
+
