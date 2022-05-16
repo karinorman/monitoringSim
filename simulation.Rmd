@@ -12,8 +12,9 @@ Let's do a little example simulation to build some of the infrastructure
 
 ```{r}
 library(dplyr)
-library(monitoringSim)
+library(tidyr)
 library(spsurvey)
+library(BalancedSampling)
 
 devtools::load_all()
 ```
@@ -73,5 +74,99 @@ selected_sites <- list(grts = grts_eqprob$sites_base$id, cube = (1:1000)[cube_eq
                        scps = scps_eqprob, lpm1 = lpm1_eqprob, lpm2 = lpm2_eqprob)
 
 purrr::map_df(selected_sites, spbalance, dist_mat = dist_mat, pik = pik)
+```
+
+Let's try the option where we turn other survey designs into `spdesign` objects from spsurvey
+
+```{r}
+# 1. Make a base spdesign object that contains all of the sites 
+base_spdes <- grts(simdf_sf, n_base = N)
+
+# #let's turn the cube samples into spdesign object
+# cube_ids <- (1:1000)[cube_eqprob==1]
+# cube_spdes <- base_spdes 
+# cube_spdes$sites_base <- base_spdes$sites_base %>% filter(id %in% cube_ids)
+# 
+# #update the spdesign$design info
+# cube_spdes$design$n_base <- length(cube_ids)
+# 
+# #### Might need to update spdesign$design$call, see if it becomes a problem #####
+```
+
+Maybe I don't even need the whole object? I just need the `sites_base` sf dataframe?
+
+```{r}
+all_sites <- base_spdes$sites_base
+
+cube_ids <- (1:1000)[cube_eqprob==1]
+cube_sites <- all_sites %>%
+  filter(id %in% cube_ids)
+```
+
+Alrighty, get all metrics for both designs
+```{r}
+purrr::map_df(list(grts = grts_eqprob$sites_base, cube = cube_spdes$sites_base), 
+              sp_balance, sframe = simdf_sf,
+              metrics = c("pielou", "simpsons", "rmse", "mse", "mae", "medae", "chisq"),
+              .id = "alg") %>%
+  pivot_wider(names_from = "metric", values_from = "value")
+```
+Let's try for all of the algorithms
+```{r}
+
+purrr:::map_dfr(selected_sites, function(x) {
+  sites <- all_sites %>% filter(id %in% x)
+  sp_balance(sites, simdf_sf, 
+             metrics = c("pielou", "simpsons", "rmse", "mse", "mae", "medae", "chisq"))
+}, .id = "alg") %>%
+  pivot_wider(names_from = "metric", values_from = "value")
+```
+How about a function to get selected sites from all the algorithms, using the same specifications
+```{r}
+get_eqprob <- function(df, sf_df, n, N) {
+  
+  pik <- rep(n/N,N) #vector of inclusion probabilities
+  #hard coding column names, sooorrryyy
+  x <- as.matrix(cbind(df$x,df$y))
+  
+  #GRTS
+  grts_fit <- grts(sf_df, n_base = n)
+  
+  #Cube sampling
+  cube_fit <- samplecube(x, pik, comment = TRUE, method = 1)
+  
+  #SCPS
+  scps_fit <- scps(pik, x)
+  
+  #LPM
+  lpm1_fit <- lpm1(pik, x)
+  lpm2_fit <- lpm2(pik, x)
+  
+  list(grts = grts_fit$sites_base$id, cube = (1:1000)[cube_fit==1],
+                       scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit)
+}
+
+
+#get dataframe of all the sites in a form the spsurvey::sp_balance likes
+base_spdes <- grts(simdf_sf, n_base = N)
+all_sites <- base_spdes$sites_base
+
+eqprob <- get_eqprob(simdf, simdf_sf, n, N)
+
+eqprob_metrics <- purrr:::map_dfr(eqprob, function(x) {
+  # the id column is consistent with the rows of the input dataframe for non grts algorithms, 
+  # so we can directly filter that column
+  sites <- all_sites %>% filter(id %in% x)
+  
+  sp_balance(sites, simdf_sf, 
+             metrics = c("pielou", "simpsons", "rmse", "mse", "mae", "medae", "chisq"))
+}, .id = "alg") %>%
+  pivot_wider(names_from = "metric", values_from = "value")
+
+```
+
+#Let's get a simple random sample to compare to
+```{r}
+
 ```
 
