@@ -13,6 +13,7 @@ Let's do a little example simulation to build some of the infrastructure
 ```{r}
 library(dplyr)
 library(tidyr)
+library(survey)
 library(spsurvey)
 library(BalancedSampling)
 
@@ -129,6 +130,9 @@ get_eqprob <- function(df, sf_df, n, N) {
   #hard coding column names, sooorrryyy
   x <- as.matrix(cbind(df$x,df$y))
   
+  #Simple random sample
+  srs <- srswor(n, N)
+  
   #GRTS
   grts_fit <- grts(sf_df, n_base = n)
   
@@ -142,7 +146,7 @@ get_eqprob <- function(df, sf_df, n, N) {
   lpm1_fit <- lpm1(pik, x)
   lpm2_fit <- lpm2(pik, x)
   
-  list(grts = grts_fit$sites_base$id, cube = (1:1000)[cube_fit==1],
+  list(srs = (1:1000)[srs==1], grts = grts_fit$sites_base$id, cube = (1:1000)[cube_fit==1],
                        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit)
 }
 
@@ -161,12 +165,8 @@ eqprob_metrics <- purrr:::map_dfr(eqprob, function(x) {
   sp_balance(sites, simdf_sf, 
              metrics = c("pielou", "simpsons", "rmse", "mse", "mae", "medae", "chisq"))
 }, .id = "alg") %>%
-  pivot_wider(names_from = "metric", values_from = "value")
-
-```
-
-#Let's get a simple random sample to compare to
-```{r}
+  pivot_wider(names_from = "metric", values_from = "value") %>%
+  mutate(efficiency = mse/filter(., alg == "srs") %>% pull(mse))
 
 ```
 
