@@ -116,10 +116,14 @@ strat_propprob <- grts(
 )
 ```
 
-Potential spatial balance metric? from Benedetti 2015 ch 7
+Let's try with an area sample
 ```{r}
+set.seed(4447864)
 
+shp_file <- st_read(here::here("data/greatvalley_outline.shp"))
+eqprob_grts_area <- grts(shp_file, n_base = n)
 ```
+
 
 # Cube Sampling
 Sample sizes is random and not fixed
@@ -186,7 +190,6 @@ spbalance(dist_mat,rep(n/N,N),sam_lpm1)
 sam_lpm2 <- lpm2(p,X)
 spbalance(dist_mat,rep(n/N,N),sam_lpm2)
 ```
-# Balanced acceptance sampling (BAS)
 
 # Algorithm Characteristics
 

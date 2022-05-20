@@ -124,11 +124,20 @@ purrr:::map_dfr(selected_sites, function(x) {
 ```
 How about a function to get selected sites from all the algorithms, using the same specifications
 ```{r}
-get_eqprob <- function(df, sf_df, n, N) {
+get_eqprob <- function(sf_df, n, N) {
   
   pik <- rep(n/N,N) #vector of inclusion probabilities
-  #hard coding column names, sooorrryyy
-  x <- as.matrix(cbind(df$x,df$y))
+
+  x <- as.matrix(cbind(sf::st_coordinates(sf_df)[,1],
+                sf::st_coordinates(sf_df)[,2]))
+  
+  # #get matrix of vertices for a bounding box of the sample area
+  # bb <- st_bbox(sf_df)
+  # bmat <- matrix(c(bb$xmin, bb$ymin,
+  #                  bb$xmin, bb$ymax,
+  #                  bb$xmax, bb$ymax,
+  #                  bb$xmax, bb$ymax),
+  #                ncol = 2, byrow = TRUE)
   
   #Simple random sample
   srs <- srswor(n, N)
@@ -146,6 +155,10 @@ get_eqprob <- function(df, sf_df, n, N) {
   lpm1_fit <- lpm1(pik, x)
   lpm2_fit <- lpm2(pik, x)
   
+  # #BAS
+  # bas_fit <- quasiSamp(n, dimension = 2, potential.sites = x, 
+  #                      study.area = bmat, inclusion.probs = pik)
+  
   list(srs = (1:1000)[srs==1], grts = grts_fit$sites_base$id, cube = (1:1000)[cube_fit==1],
                        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit)
 }
@@ -155,7 +168,7 @@ get_eqprob <- function(df, sf_df, n, N) {
 base_spdes <- grts(simdf_sf, n_base = N)
 all_sites <- base_spdes$sites_base
 
-eqprob <- get_eqprob(simdf, simdf_sf, n, N)
+eqprob <- get_eqprob(simdf_sf, n, N)
 
 eqprob_metrics <- purrr:::map_dfr(eqprob, function(x) {
   # the id column is consistent with the rows of the input dataframe for non grts algorithms, 
@@ -168,5 +181,30 @@ eqprob_metrics <- purrr:::map_dfr(eqprob, function(x) {
   pivot_wider(names_from = "metric", values_from = "value") %>%
   mutate(efficiency = mse/filter(., alg == "srs") %>% pull(mse))
 
+```
+
+Let's try a full example sampling an area instead of a population.
+```{r}
+set.seed(12412)
+
+#Get example shapefile of the central valley
+valley <- st_read(here::here("data/greatvalley_outline.shp"))
+
+#function for get a set of candidate points for the landscape, adapted from `grts_stratum`
+get_cand_points <- function(polygon, n, pt_density = 10){
+  
+  #define how many candidate points we want
+  n_size <- as.integer(ceiling(pmin(1e+09, pt_density * n)))
+  
+  #get random points
+  cand_points <- st_sample(polygon, size = n_size, type = "hexagonal", 
+                   exact = TRUE) %>%
+    st_as_sf(as.data.frame(.), crs = st_crs(polygon)) %>%
+    st_cast(to = "POINT") %>%
+    filter(!st_is_empty(.)) %>%
+    st_join(polygon) #get metadata from the polygon 
+}
+
+valley_cand_points <- get_cand_points(valley, n)
 ```
 
