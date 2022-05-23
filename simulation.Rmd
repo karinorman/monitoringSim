@@ -192,6 +192,8 @@ valley <- st_read(here::here("data/greatvalley_outline.shp"))
 
 #function for get a set of candidate points for the landscape, adapted from `grts_stratum`
 get_cand_points <- function(polygon, n, pt_density = 10){
+  # this code is adapted from the spsurvey::grts_stratum function that is not exported, but selects the points for 
+  # point, linear, and polygon inputs
   
   #define how many candidate points we want
   n_size <- as.integer(ceiling(pmin(1e+09, pt_density * n)))
