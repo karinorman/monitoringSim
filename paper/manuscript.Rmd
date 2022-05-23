@@ -33,19 +33,7 @@ Auxillary information can be included to inform inclusion probability (GRTS, SCP
 
 # Questions 
 
-## Simple spatial balance:
-- Which algorithm gives a better spatial balance at different scales, landscapes structures, etc (when including landscape/environmental characteristics as auxillary variables)
-
-- or the other way around, give the algorithm different landscapes without any landscape info, and see which ones give best coverage of the different variables?
-
-## Ecological measures:
-
-Guerin 2020 example:
-- is environmental heterogeneity a good surrogate for ecological diversity?
-- comoparing density of sampling across environmental gradients, also size of the sampled environmental space
-  - use soil, landform, and climate gradients (already stratifying by biogregions)
-
-Options:
+Implementation Options:
 
 1. Naive algorithms (no enviro variables or strata), how is a) spatial coverage, b) environmental coverage (measured by: sampling density relative to background along gradients, e.g. elevation, precip etc; or multivariate comparison of the sample space based on centroid location or dispersion around the centroid; see Guerin et al 2020); use data like soil, landform, climate
 
@@ -61,8 +49,8 @@ Questions:
 - Assumption that better spatial balance of sites = more representative (assuming that there's some degree of spatial correlation in the study area); Gitzen et al Ch 5
 
 3. Which algorithms perform better at different scales and different kinds of landscapes (i.e. the moving window across a landscape)
-- how will the algorithm "see" the landscape changes? this comparison could be just for conditioning/stratifying version
-
+  - first: for naive implementation - which algorithms happen to perform best (and under what scenarios), when you don't have environmental data to input
+  - second: when environmental data has been inputted
 
 
 # Methods
