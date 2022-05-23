@@ -10,8 +10,59 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Framing
 
-Survey design is a fundamental challenge of monitoring ecological status fro conservation, management, and establishing temporal trends. Increasingly we've moved beyond the non-probaballistic/haphazard sampling based on accessiblity or expert opinion to establish sampling frameworks that explicitly consider statisticall inference from the resulting data. Still, the variety of algorithms for survey designs continue to be constrained to a few well known algorithms accessible through R pakcages. Survey design is a challenge for a variety of fields, and development of increasingly sophisticated algorithms is on going. This development presents a significant opportunity for Ecology to expand its toolbox for survey design. Still, the lack of application of algorithms from outside ecology means we do not have good intuition for algorithm selection, and the scenarios for which different algorithms may be most suitable, considering factors such as scale, heterogeneity, sample size, and sampling targets/target variables (e.g. what you want to sample).
+Survey design is a fundamental challenge of monitoring ecological status fro conservation, management, and establishing temporal trends. Increasingly we've moved beyond the non-probaballistic sampling (haphazard, expert-chosen, convenience) based on accessiblity or expert opinion to establish sampling frameworks that explicitly consider statisticall inference from the resulting data. Still, the variety of algorithms for survey designs continue to be constrained to a few well known algorithms accessible through R pakcages. Survey design is a challenge for a variety of fields, and development of increasingly sophisticated algorithms is on going. This development presents a significant opportunity for Ecology to expand its toolbox for survey design. Still, the lack of application of algorithms from outside ecology means we do not have good intuition for algorithm selection, and the scenarios for which different algorithms may be most suitable, considering factors such as scale, heterogeneity, sample size, and sampling targets/target variables (e.g. what you want to sample).
 
 Common algorithms for survey design are simple random sampling ,stratified sampling, GRTS. We found x papers citing each of these. A whole bunch of other algorithms outlined by [Benedetti2017; Benedetti 2015; Kermorvant 2019].
+
+# Algorithm Descriptions
+
+Compare how stratification and auxiliary variables work
+
+## Generalized Random Tessellation Stratified (GRTS)
+
+Auxiliary variables: 
+## Cube Sampling
+Auxiliary variables: 
+## Spatiall Correlated Poison Sampling
+Auxiliary variables: 
+## Local Pivitol Method
+Auxiliary variables: 
+
+
+Auxillary information can be included to inform inclusion probability (GRTS, SCPS) or as an inherent part of the sampling process (CUBE)
+
+# Questions 
+
+## Simple spatial balance:
+- Which algorithm gives a better spatial balance at different scales, landscapes structures, etc (when including landscape/environmental characteristics as auxillary variables)
+
+- or the other way around, give the algorithm different landscapes without any landscape info, and see which ones give best coverage of the different variables?
+
+## Ecological measures:
+
+Guerin 2020 example:
+- is environmental heterogeneity a good surrogate for ecological diversity?
+- comoparing density of sampling across environmental gradients, also size of the sampled environmental space
+  - use soil, landform, and climate gradients (already stratifying by biogregions)
+
+Options:
+
+1. Naive algorithms (no enviro variables or strata), how is a) spatial coverage, b) environmental coverage (measured by: sampling density relative to background along gradients, e.g. elevation, precip etc; or multivariate comparison of the sample space based on centroid location or dispersion around the centroid; see Guerin et al 2020); use data like soil, landform, climate
+
+2. Stratify by ecoregion
+
+3. condition on environmental variables
+
+Questions:
+
+1. Does stratification or conditioning perform better for environmental coverage (i.e. GRTS stratified vs cube w/enviro variables)
+
+2. Is there a mismatch between environmental coverage, species coverage, and spatial balance? use range maps
+- Assumption that better spatial balance of sites = more representative (assuming that there's some degree of spatial correlation in the study area); Gitzen et al Ch 5
+
+3. Which algorithms perform better at different scales and different kinds of landscapes (i.e. the moving window across a landscape)
+- how will the algorithm "see" the landscape changes? this comparison could be just for conditioning/stratifying version
+
+
 
 # Methods
