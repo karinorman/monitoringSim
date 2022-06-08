@@ -16,6 +16,8 @@ library(tidyr)
 library(survey)
 library(spsurvey)
 library(BalancedSampling)
+library(ggplot2)
+library(sampling)
 
 devtools::load_all()
 ```
@@ -42,7 +44,7 @@ q2obs <- sample(LETTERS[1:2], N, replace = TRUE) #categorical variable
 simdf <- cbind(simdf,yobs,ypps,q1obs,q2obs)
 
 #distance matrix for candidate sites
-dist_mat <- as.matrix(dist(simdf %>% select(x, y)))
+dist_mat <- as.matrix(dist(simdf %>% dplyr::select(x, y)))
 
 
 #inclusion probs and df of cooridnates are often inputs
@@ -124,8 +126,9 @@ purrr:::map_dfr(selected_sites, function(x) {
 ```
 How about a function to get selected sites from all the algorithms, using the same specifications
 ```{r}
-get_eqprob <- function(sf_df, n, N) {
+get_eqprob <- function(sf_df, n) {
   
+  N <- dim(sf_df)[1]
   pik <- rep(n/N,N) #vector of inclusion probabilities
 
   x <- as.matrix(cbind(sf::st_coordinates(sf_df)[,1],
@@ -168,7 +171,7 @@ get_eqprob <- function(sf_df, n, N) {
 base_spdes <- grts(simdf_sf, n_base = N)
 all_sites <- base_spdes$sites_base
 
-eqprob <- get_eqprob(simdf_sf, n, N)
+eqprob <- get_eqprob(simdf_sf, n)
 
 eqprob_metrics <- purrr:::map_dfr(eqprob, function(x) {
   # the id column is consistent with the rows of the input dataframe for non grts algorithms, 
@@ -191,22 +194,91 @@ set.seed(12412)
 valley <- st_read(here::here("data/greatvalley_outline.shp"))
 
 #function for get a set of candidate points for the landscape, adapted from `grts_stratum`
-get_cand_points <- function(polygon, n, pt_density = 10){
+get_cand_points <- function(study_frame, n, pt_density = 10){
   # this code is adapted from the spsurvey::grts_stratum function that is not exported, but selects the points for 
-  # point, linear, and polygon inputs
+  # point, linear, and polygon inputs. In the GRTS function, points are generated independently for each stratum
+  # as a function of stratum sample size
   
   #define how many candidate points we want
   n_size <- as.integer(ceiling(pmin(1e+09, pt_density * n)))
   
+  #if the spatial object is a raster, create a polygon to sample from 
+  if (class(study_frame) == "RasterLayer"){
+   samp_obj <- st_bbox(study_frame) %>%
+      st_as_sfc()
+  } else samp_obj <- study_frame
+  
   #get random points
-  cand_points <- st_sample(polygon, size = n_size, type = "hexagonal", 
+  cand_points <- st_sample(samp_obj, size = n_size, type = "hexagonal", 
                    exact = TRUE) %>%
-    st_as_sf(as.data.frame(.), crs = st_crs(polygon)) %>%
+    st_as_sf(as.data.frame(.), crs = st_crs(study_frame)) %>%
     st_cast(to = "POINT") %>%
-    filter(!st_is_empty(.)) %>%
-    st_join(polygon) #get metadata from the polygon 
+    filter(!st_is_empty(.))# %>%
+    #st_join(study_frame) #get metadata from the polygon 
 }
 
 valley_cand_points <- get_cand_points(valley, n)
+```
+
+Sampling continent scale
+```{r}
+#devtools::install_github("ropensci/FedData")
+library(FedData)
+library(raster)
+
+NLCD <- get_nlcd(
+    template = valley,
+    year = 2019,
+    label = "central_valley"
+)
+
+plot(NLCD)
+
+#we need a smaller chunk to work with
+#got these extent coordinates from drawExtent() point and click
+crop_rast <- extent(matrix(c(-2212245, -2129070, 2103204, 2165256), nrow = 2))
+NLCDcrop <- crop(NLCD, crop_rast)
+plot(NLCDcrop)
+```
+
+Get summary stats for different attributes
+```{r}
+#get the area for different landcover types
+NLCDcrop_df <- as.data.frame(NLCDcrop, xy = TRUE)
+
+areas <- NLCDcrop_df %>% 
+  group_by(value) %>%
+  tally() %>%
+  mutate(area = n * res(NLCDcrop)[1] * res(NLCDcrop)[2])
+```
+
+Let's get some sample monitoring designs for the raster 
+```{r}
+nlcd_samp_points <- get_cand_points(NLCDcrop, n)
+
+#visualize points
+# plot(NLCDcrop)
+# points(sf::st_coordinates(nlcd_samp_points)[,1],
+#                 sf::st_coordinates(nlcd_samp_points)[,2],
+#        pch = .5)
+
+x_coords <- sf::st_coordinates(nlcd_samp_points)[,1]
+y_coords <- sf::st_coordinates(nlcd_samp_points)[,2]
+plot(NLCDcrop)
+symbols(x= x_coords, y=y_coords, circles = rep(0, length(x_coords)),inches=1/4,
+                  add = TRUE, bg="black", fg=NULL)
+
+#plot with random assigned "selected" as example"
+set.seed(1234)
+selected <- sample(c("black", "white"), 1020, replace = TRUE)
+
+nlcd_samp_example <- cbind(nlcd_samp_points, selected)
+plot(NLCDcrop)
+symbols(x= x_coords, y=y_coords, circles = rep(0, length(x_coords)),inches=1/4,
+                  add = TRUE, bg=selected, fg=NULL)
+
+#get sample designs from different algorithms
+#for some reason GRTS doesn't like the sample dataframe we created, gotta figure that out
+valley_eqprob <- get_eqprob(nlcd_samp_points %>% mutate(rand = 5), n)
 ```
 

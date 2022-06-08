@@ -1,0 +1,122 @@
+---
+title: "IUCN evaluation"
+output: html_document
+date: '2022-05-27'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(sf)
+library(survey)
+library(spsurvey)
+library(BalancedSampling)
+library(ggplot2)
+library(sampling)
+library(raster)
+
+devtools::load_all()
+```
+
+
+```{r}
+#sf::sf_use_s2(FALSE)
+
+#read in IUCN data
+ranges <- st_read(here::here("data/iucn_terrestrial_mammals/MAMMALS_TERRESTRIAL_ONLY.shp")) %>%
+  rename(order = "order_")
+
+#let's get bats
+bats <- ranges %>% filter(order == "CHIROPTERA") %>%
+  st_make_valid()
+
+#let's get Canada
+cdn <- getData("GADM",country="can",level=0) %>%
+  st_as_sf() %>%
+  st_make_valid()
+
+#crop bats to canada
+cdn_bats <- st_intersection(bats, cdn)
+```
+Let's try just quebec
+```{r}
+cdn_regions <- getData("GADM",country="can",level=1) %>%
+  st_as_sf()
+
+qc <- cdn_regions %>% filter(NAME_1 == "Québec") %>%
+  st_make_valid()
+
+qc_bats <- st_intersection(bats, qc)
+
+plot(st_geometry(cdn_bats))
+```
+
+Let's do an equal probability monitoring network for all of quebec
+```{r}
+qc_proj <- st_transform(qc, crs = 5070)
+qc_bats_proj <- st_transform(qc_bats, crs = 5070)
+
+set.seed(12356)
+n <- 100
+
+qc_cand_points <- get_cand_points(qc_proj, n)
+qc_eqprob <- get_eqprob(qc_cand_points, n = n)
+```
+
+Evaluate cube method for species coverage
+```{r}
+#extract species list for each point from range maps
+cube_points <- qc_cand_points %>%
+  filter(id %in% qc_eqprob$cube)
+
+#get a dense matrix of intersections between points and ranges
+#points and names are brute force reassigned to the matrix, need to double check that that works
+bat_points <- st_intersects(cube_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
+  as_tibble() %>%
+  magrittr::set_colnames(qc_bats_proj$binomial) %>%
+  bind_cols(cube_points)
+```
+
+Plot a range with it's supposedly intersecting points (check that intersection did what we thought)
+```{r}
+bat_name <- "Lasionycteris noctivagans"
+
+bat_range <- qc_bats_proj %>% 
+  filter(binomial == bat_name)
+
+bat_name_enc <- enquo(bat_name)
+bat_range_points <- bat_points %>%
+  dplyr::select(id, x, presence = bat_name) %>%
+  filter(presence == TRUE)
+
+ggplot() +
+  geom_sf(data = bat_range) +
+  geom_sf(data = bat_range_points)
+```
+Now we want multiple equa probability replicates at multiple sample sizes.
+```{r}
+#get more candidate points, increase N by pt_density argument
+qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
+
+#get multiple replicates for a single sample size
+repn <- 3
+
+get_reps <- function(n, nreps) {
+  purrr::map_dfr(1:nreps, 
+                 function(rep) {
+                   print(c(rep, n))
+                   get_eqprob(qc_cand_points, n = n) %>% 
+                     mutate(rep = rep)  
+                 })
+                 
+}
+
+sample_sizes <- c(10, 20, 50, 100, 500, 1000, 5000)
+samplesize_sim <- purrr::map_dfr(sample_sizes, get_reps, nreps = repn)
+
+```
+

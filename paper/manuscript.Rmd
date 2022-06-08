@@ -16,20 +16,23 @@ Common algorithms for survey design are simple random sampling ,stratified sampl
 
 # Algorithm Descriptions
 
-Compare how stratification and auxiliary variables work
+- Compare how stratification and auxiliary variables work
+- logisitical pros/cons (i.e. GRTS can oversample to give you potential replacement plots if an original one doesn't work)
 
 ## Generalized Random Tessellation Stratified (GRTS)
+Auxiliary variables: Can be used to inform weighting or define stratification, not incorporated in sampling process.
 
-Auxiliary variables: 
 ## Cube Sampling
-Auxiliary variables: 
-## Spatiall Correlated Poison Sampling
-Auxiliary variables: 
+Auxiliary variables: Sites are chosen as a solution to the "balancing equations", can balance across any variables
+
+## Spatiall Correlated Poisson Sampling
+Auxiliary variables: Include as part of weights, either up front or potentially as a way to condition the next selection based on characteristics of the previous selection.
+
 ## Local Pivitol Method
-Auxiliary variables: 
+Auxiliary variables: Use auxillary data as something to balance across, sites are chosen as a function of euclidian distance across the sample space of all variables.
 
 
-Auxillary information can be included to inform inclusion probability (GRTS, SCPS) or as an inherent part of the sampling process (CUBE)
+Auxillary information can be included to inform inclusion probability (GRTS, SCPS) or as an inherent part of the sampling process (CUBE, LPM)
 
 # Questions 
 
