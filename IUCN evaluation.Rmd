@@ -24,11 +24,12 @@ devtools::load_all()
 
 
 ```{r}
-#sf::sf_use_s2(FALSE)
+sf::sf_use_s2(FALSE)
 
 #read in IUCN data
-ranges <- st_read(here::here("data/iucn_terrestrial_mammals/MAMMALS_TERRESTRIAL_ONLY.shp")) %>%
-  rename(order = "order_")
+ranges <- st_read(here::here("data_store/iucn_terrestrial_mammals/MAMMALS_TERRESTRIAL_ONLY.shp")) %>%
+  rename(order = "order_") %>%
+  st_make_valid()
 
 #let's get bats
 bats <- ranges %>% filter(order == "CHIROPTERA") %>%
@@ -42,6 +43,12 @@ cdn <- getData("GADM",country="can",level=0) %>%
 #crop bats to canada
 cdn_bats <- st_intersection(bats, cdn)
 ```
+
+Get WWF world ecoregions
+```{r}
+ecoreg <- st_read(here::here("data_store/wwf_ecoregions/wwf_terr_ecos.shp")) 
+```
+
 Let's try just quebec
 ```{r}
 cdn_regions <- getData("GADM",country="can",level=1) %>%
@@ -52,6 +59,10 @@ qc <- cdn_regions %>% filter(NAME_1 == "Québec") %>%
 
 qc_bats <- st_intersection(bats, qc)
 
+#get canadian mammals, use buffer to fix self-intersection errors
+ranges_buff <- st_buffer(ranges, 0)
+qc_mammals <- st_intersection(ranges_buff, qc)
+
 plot(st_geometry(cdn_bats))
 ```
 
@@ -59,52 +70,54 @@ Let's do an equal probability monitoring network for all of quebec
 ```{r}
 qc_proj <- st_transform(qc, crs = 5070)
 qc_bats_proj <- st_transform(qc_bats, crs = 5070)
+qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
 
-set.seed(12356)
-n <- 100
-
-qc_cand_points <- get_cand_points(qc_proj, n)
-qc_eqprob <- get_eqprob(qc_cand_points, n = n)
+# set.seed(12356)
+# n <- 100
+# 
+# qc_cand_points <- get_cand_points(qc_proj, n)
+# qc_eqprob <- get_eqprob(qc_cand_points, n = n)
 ```
 
 Evaluate cube method for species coverage
 ```{r}
-#extract species list for each point from range maps
-cube_points <- qc_cand_points %>%
-  filter(id %in% qc_eqprob$cube)
-
-#get a dense matrix of intersections between points and ranges
-#points and names are brute force reassigned to the matrix, need to double check that that works
-bat_points <- st_intersects(cube_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
-  as_tibble() %>%
-  magrittr::set_colnames(qc_bats_proj$binomial) %>%
-  bind_cols(cube_points)
+# #extract species list for each point from range maps
+# cube_points <- qc_cand_points %>%
+#   filter(id %in% qc_eqprob$cube)
+# 
+# #get a dense matrix of intersections between points and ranges
+# #points and names are brute force reassigned to the matrix, need to double check that that works
+# bat_points <- st_intersects(cube_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
+#   as_tibble() %>%
+#   magrittr::set_colnames(qc_bats_proj$binomial) %>%
+#   bind_cols(cube_points)
 ```
 
 Plot a range with it's supposedly intersecting points (check that intersection did what we thought)
 ```{r}
-bat_name <- "Lasionycteris noctivagans"
-
-bat_range <- qc_bats_proj %>% 
-  filter(binomial == bat_name)
-
-bat_name_enc <- enquo(bat_name)
-bat_range_points <- bat_points %>%
-  dplyr::select(id, x, presence = bat_name) %>%
-  filter(presence == TRUE)
-
-ggplot() +
-  geom_sf(data = bat_range) +
-  geom_sf(data = bat_range_points)
+# bat_name <- "Lasionycteris noctivagans"
+# 
+# bat_range <- qc_bats_proj %>% 
+#   filter(binomial == bat_name)
+# 
+# bat_name_enc <- enquo(bat_name)
+# bat_range_points <- bat_points %>%
+#   dplyr::select(id, x, presence = bat_name) %>%
+#   filter(presence == TRUE)
+# 
+# ggplot() +
+#   geom_sf(data = bat_range) +
+#   geom_sf(data = bat_range_points)
 ```
 
 Now we want multiple equa probability replicates at multiple sample sizes.
 ```{r}
+n <- 100
 #get more candidate points, increase N by pt_density argument
 qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
 
 #get multiple replicates for a single sample size
-repn <- 3
+repn <- 100
 
 get_reps <- function(n, nreps) {
   purrr::map_dfr(1:nreps, 
@@ -119,10 +132,12 @@ get_reps <- function(n, nreps) {
 sample_sizes <- c(10, 20, 50, 100, 500, 1000, 5000)
 samplesize_sim <- purrr::map_dfr(sample_sizes[1:3], ~get_reps(.x, nreps = repn) %>% mutate(sample_size = .x))
 
+library(furrr)
 #options(future.debug = FALSE)
+#have to source internal functions so the workers can see them
 source("R/get_eqprob.R")
-plan(multiprocess, workers = 3)
-samplesize_sim <- furrr::future_map_dfr(sample_sizes[1:3], 
+plan("multisession", workers = length(sample_sizes))
+samplesize_sim <- furrr::future_map_dfr(sample_sizes, 
                                         ~get_reps(.x, nreps = repn) %>% mutate(sample_size = .x),
                                         .options = furrr_options(packages = "monitoringSim",  
                                         seed = TRUE))
@@ -131,28 +146,68 @@ samplesize_sim <- furrr::future_map_dfr(sample_sizes[1:3],
 
 Get species counts for each candidate point
 ```{r}
-specieslist <- st_intersects(qc_cand_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
+bat_specieslist <- st_intersects(qc_cand_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
   as_tibble() %>%
   magrittr::set_colnames(qc_bats_proj$binomial) %>%
   bind_cols(qc_cand_points)
+
+mammal_specieslist <- st_intersects(qc_cand_points, qc_mammals_proj, prepared = TRUE, sparse = FALSE) %>%
+  as_tibble() %>%
+  magrittr::set_colnames(qc_mammals_proj$binomial) %>%
+  bind_cols(qc_cand_points)
 ```
+
 Look up species lists for each monitoring network
 ```{r}
-specieslist_long <- specieslist %>%
+specieslist_long <- mammal_specieslist %>%
   pivot_longer(cols = c(-x, -id), names_to = "species") %>%
   filter(value == TRUE) %>%
   dplyr::select(-value)
 
 
 design_lists <- samplesize_sim %>%
-  pivot_longer(cols = c(-id, -x, -rep, -sample_size), names_to = "algorithm") %>%
+  dplyr::select(-x) %>%
+  pivot_longer(cols = c(-id, -rep, -sample_size), names_to = "algorithm") %>%
   filter(value == 1) %>%
   dplyr::select(-value) %>%
-  left_join(specieslist_long)
+  left_join(specieslist_long, by = "id")
 
-design_lists %>% 
+richness_df <- design_lists %>% 
   dplyr::group_by(rep, algorithm, sample_size) %>%
-  summarize(richness = n_distinct(species))
+  summarize(richness = n_distinct(species, na.rm = TRUE))
+
+richness_stats <- richness_df %>%
+  group_by(algorithm, sample_size) %>%
+  summarize(mean = mean(richness),
+            sd = sd(richness))
+
+ggplot(richness_stats, aes(x = sample_size, y = mean, color = algorithm)) +
+  geom_line() + 
+  labs(y ="Mean Richness", x = "Sample Size") +
+  theme_classic()
+ # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
+
+ggsave("figures/ex_richness_sat.jpg", width = 5, height = 3.5, units = "in")
 ```
 
+Get spatial balance metric for each rep
+```{r}
+# design_index_df <- design_lists %>% 
+#   dplyr::select(-species) %>%
+#   distinct()
+#   
+
+```
+
+Land cover evaluations
+```{r}
+can_lc <- raster("data_store/CAN_NALCMS_2010_v2_land_cover_30m/CAN_NALCMS_2010_v2_land_cover_30m.tif") 
+  
+
+qc_lc <- can_lc %>% #crop(can_lc, st_bbox(cdn)) %>%
+  #projectRaster(., crs = 5070) %>%
+  mask(., qc_proj)
+
+plot(qc_lc)
+```
 
