@@ -22,48 +22,10 @@ library(raster)
 devtools::load_all()
 ```
 
-
 ```{r}
-sf::sf_use_s2(FALSE)
-
-#read in IUCN data
-ranges <- st_read(here::here("data_store/iucn_terrestrial_mammals/MAMMALS_TERRESTRIAL_ONLY.shp")) %>%
-  rename(order = "order_") %>%
-  st_make_valid()
-
-#let's get bats
-bats <- ranges %>% filter(order == "CHIROPTERA") %>%
-  st_make_valid()
-
-#let's get Canada
-cdn <- getData("GADM",country="can",level=0) %>%
-  st_as_sf() %>%
-  st_make_valid()
-
-#crop bats to canada
-cdn_bats <- st_intersection(bats, cdn)
-```
-
-Get WWF world ecoregions
-```{r}
-ecoreg <- st_read(here::here("data_store/wwf_ecoregions/wwf_terr_ecos.shp")) 
-```
-
-Let's try just quebec
-```{r}
-cdn_regions <- getData("GADM",country="can",level=1) %>%
-  st_as_sf()
-
-qc <- cdn_regions %>% filter(NAME_1 == "Québec") %>%
-  st_make_valid()
-
-qc_bats <- st_intersection(bats, qc)
-
-#get canadian mammals, use buffer to fix self-intersection errors
-ranges_buff <- st_buffer(ranges, 0)
-qc_mammals <- st_intersection(ranges_buff, qc)
-
-plot(st_geometry(cdn_bats))
+load(here::here("data/qc.rda"))
+load(here::here("data/qc_bats.rda"))
+load(here::here("data/qc_mammals.rda"))
 ```
 
 Let's do an equal probability monitoring network for all of quebec
@@ -110,7 +72,7 @@ Plot a range with it's supposedly intersecting points (check that intersection d
 #   geom_sf(data = bat_range_points)
 ```
 
-Now we want multiple equa probability replicates at multiple sample sizes.
+Now we want multiple equal probability replicates at multiple sample sizes.
 ```{r}
 n <- 100
 #get more candidate points, increase N by pt_density argument
