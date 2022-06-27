@@ -24,14 +24,14 @@ devtools::load_all()
 
 ```{r}
 load(here::here("data/qc.rda"))
-load(here::here("data/qc_bats.rda"))
+#load(here::here("data/qc_bats.rda"))
 load(here::here("data/qc_mammals.rda"))
 ```
 
 Let's do an equal probability monitoring network for all of quebec
 ```{r}
 qc_proj <- st_transform(qc, crs = 5070)
-qc_bats_proj <- st_transform(qc_bats, crs = 5070)
+#qc_bats_proj <- st_transform(qc_bats, crs = 5070)
 qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
 
 # set.seed(12356)
@@ -104,14 +104,15 @@ samplesize_sim <- furrr::future_map_dfr(sample_sizes,
                                         .options = furrr_options(packages = "monitoringSim",  
                                         seed = TRUE))
 
+usethis::use_data(samplesize_sim)
 ```
 
 Get species counts for each candidate point
 ```{r}
-bat_specieslist <- st_intersects(qc_cand_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
-  as_tibble() %>%
-  magrittr::set_colnames(qc_bats_proj$binomial) %>%
-  bind_cols(qc_cand_points)
+# bat_specieslist <- st_intersects(qc_cand_points, qc_bats_proj, prepared = TRUE, sparse = FALSE) %>%
+#   as_tibble() %>%
+#   magrittr::set_colnames(qc_bats_proj$binomial) %>%
+#   bind_cols(qc_cand_points)
 
 mammal_specieslist <- st_intersects(qc_cand_points, qc_mammals_proj, prepared = TRUE, sparse = FALSE) %>%
   as_tibble() %>%
@@ -119,7 +120,7 @@ mammal_specieslist <- st_intersects(qc_cand_points, qc_mammals_proj, prepared = 
   bind_cols(qc_cand_points)
 ```
 
-Look up species lists for each monitoring network
+Look up mammal species lists for each monitoring network
 ```{r}
 specieslist_long <- mammal_specieslist %>%
   pivot_longer(cols = c(-x, -id), names_to = "species") %>%
@@ -163,13 +164,10 @@ Get spatial balance metric for each rep
 
 Land cover evaluations
 ```{r}
-can_lc <- raster("data_store/CAN_NALCMS_2010_v2_land_cover_30m/CAN_NALCMS_2010_v2_land_cover_30m.tif") 
-  
-
-qc_lc <- can_lc %>% #crop(can_lc, st_bbox(cdn)) %>%
-  #projectRaster(., crs = 5070) %>%
+qc_lc <- raster("data/can_lc_proj.tif") %>%
   mask(., qc_proj)
 
-plot(qc_lc)
+#extract land cover points 
+
 ```
 

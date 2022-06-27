@@ -52,3 +52,12 @@ usethis::use_data(qc_mammals)
 
 #### WWF ecoregions ####
 ecoreg <- st_read(here::here("data_store/wwf_ecoregions/wwf_terr_ecos.shp"))
+
+########################
+
+#### Landcover data ####
+
+#Reproject raster using GDAL from the terminal, so much faster
+#gdalwarp -t_srs ESPG:5070 CAN_NALCMS_2015_v2_land_cover_30m/CAN_NALCMS_2015_v2_land_cover_30m.tif can_lc_proj.tif
+
+########################

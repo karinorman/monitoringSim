@@ -17,7 +17,7 @@ get_cand_points <- function(study_frame, n, pt_density = 10){
   n_size <- as.integer(ceiling(pmin(1e+09, pt_density * n)))
 
   #if the spatial object is a raster, create a polygon to sample from
-  if (class(study_frame) == "RasterLayer"){
+  if (class(study_frame)[1] == "RasterLayer"){
     samp_obj <- st_bbox(study_frame) %>%
       st_as_sfc()
   } else samp_obj <- study_frame
