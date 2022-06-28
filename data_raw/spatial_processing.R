@@ -58,6 +58,33 @@ ecoreg <- st_read(here::here("data_store/wwf_ecoregions/wwf_terr_ecos.shp"))
 #### Landcover data ####
 
 #Reproject raster using GDAL from the terminal, so much faster
-#gdalwarp -t_srs ESPG:5070 CAN_NALCMS_2015_v2_land_cover_30m/CAN_NALCMS_2015_v2_land_cover_30m.tif can_lc_proj.tif
+#gdalwarp -t_srs EPSG:5070 CAN_NALCMS_2015_v2_land_cover_30m/CAN_NALCMS_2015_v2_land_cover_30m.tif can_lc_proj.tif
 
 ########################
+
+#### WorldClim #########
+
+# download worldclim data
+getData("worldclim", var = "tmax", res = 2.5, path = here::here("data"))
+getData("worldclim", var = "tmin", res = 2.5, path = here::here("data"))
+getData("worldclim", var = "prec", res = 2.5, path = here::here("data"))
+getData("worldclim", var = "bio", res = 2.5, path = here::here("data"))
+
+# get list of raster layer files
+wc_files <- list.files(here::here("data/wc2-5"), pattern = "*.bil$")
+
+# reproject all the raster files using GDAL from the terminal
+folder <- "wc2-5_proj"
+dir.create(here::here("data", folder))
+
+for (i in wc_files){
+  cmd <- paste0("gdalwarp -t_srs EPSG:5070 ", here::here("data/wc2-5", i), " ",
+                here::here("data", folder, i))
+  system(cmd)
+}
+
+# create raster stack of projected files
+clim_stack <- stack(here::here("data/wc2-5_proj", wc_files))
+
+usethis::use_data(clim_stack)
+#######################
