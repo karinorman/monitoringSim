@@ -131,9 +131,6 @@ specieslist_long <- mammal_specieslist %>%
 
 design_lists <- samplesize_sim %>%
   dplyr::select(-x) %>%
-  pivot_longer(cols = c(-id, -rep, -sample_size), names_to = "algorithm") %>%
-  filter(value == 1) %>%
-  dplyr::select(-value) %>%
   left_join(specieslist_long, by = "id")
 
 richness_df <- design_lists %>% 

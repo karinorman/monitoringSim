@@ -43,8 +43,8 @@ get_eqprob <- function(sf_df, n) {
   list(srs = which(srs == 1), grts = grts_fit$sites_base$id, cube = which(cube_fit == 1),
        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
-    rename(pointid = `.x`) %>%
-    left_join(sf_df, by = c("pointid" = "id"))
+    rename(id = `.x`) %>%
+    left_join(sf_df)
 }
 
 
