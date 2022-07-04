@@ -42,21 +42,9 @@ get_eqprob <- function(sf_df, n) {
 
   list(srs = which(srs == 1), grts = grts_fit$sites_base$id, cube = which(cube_fit == 1),
        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit) %>%
-    indexlist_to_mat() %>%
-    as.data.frame() %>%
-    mutate(id = row_number()) %>%
-    left_join(sf_df)
+    map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
+    rename(pointid = `.x`) %>%
+    left_join(sf_df, by = c("pointid" = "id"))
 }
 
-indexlist_to_mat <- function(x){
-  n.cols <- length(x)
-  n.ids <- sapply(x,length)
-  n.rows <- max(unlist(x))
-  out <- matrix(0,nrow=n.rows,ncol=n.cols)
 
-  id <- unlist(x)+rep(0:(n.cols-1),n.ids)*n.rows
-  out[id] <- 1
-  colnames(out) <- names(x)
-
-  return(out)
-}

@@ -86,8 +86,9 @@ get_reps <- function(n, nreps) {
                  function(rep) {
                    print(c(rep, n))
                    get_eqprob(qc_cand_points, n = n) %>% 
-                     mutate(rep = rep)  
-                 })
+                     mutate(rep = rep)
+                 }) %>% 
+    unite("simid", rep, sample_size, algorithm)
                  
 }
 
@@ -159,15 +160,6 @@ Get spatial balance metric for each rep
 #   dplyr::select(-species) %>%
 #   distinct()
 #   
-
-```
-
-Land cover evaluations
-```{r}
-qc_lc <- raster("data/can_lc_proj.tif") %>%
-  mask(., qc_proj)
-
-#extract land cover points 
 
 ```
 
