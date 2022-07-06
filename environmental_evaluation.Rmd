@@ -9,10 +9,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+library(hypervolume)
 library(dplyr)
 library(tidyr)
 library(purrr)
-library(hypervolume)
 ```
 
 Get selected points and landcover data
@@ -51,11 +51,14 @@ library(hypervolume)
 
 #PCA of the variables to reduce the dimensionality
 envdata <- envdata_pts %>% 
-  dplyr::select(-ID, -can_lc_proj) %>%
+  dplyr::select(-can_lc_proj) %>%
   drop_na()
 
-env_pca <- ade4::dudi.pca(df = envdata, 
+env_pca <- ade4::dudi.pca(df = dplyr::select(envdata, -ID), 
   center = TRUE, scale = TRUE, scannf = FALSE, nf = 3)
+
+env_pc <- as.data.frame(env_pca$li) %>%
+  cbind(ID = envdata$ID, .)
 
 # envdata_scale <- envdata_pts %>% 
 #   select(-ID, -can_lc_proj) %>%
@@ -65,7 +68,7 @@ comp_hyp <- hypervolume(env_pca$li)
 
 # example comparison but taking a random subset of points
 
-envdata_samp <- sample_n(as.data.frame(env_pca$li), 500)
+envdata_samp <- sample_n(env_pca$li, 500)
 samp_hyp <- hypervolume(envdata_samp)
 
 overlap <- hypervolume_set(comp_hyp, samp_hyp, check.memory = FALSE)
@@ -86,7 +89,7 @@ get_prop_overlap <- function(samp_prop, comp_hyp, env_data){
   hypervolume_overlap_statistics(overlap)
 }
 
-sim_df <- map_df(samp_props, get_prop_overlap, comp_hyp = comp_hyp, env_data = as.data.frame(env_pca$li)) %>%
+sim_df <- map_df(samp_props, get_prop_overlap, comp_hyp = comp_hyp, env_data = env_pca$li) %>%
   cbind(samp_props, .)
 
 ```
@@ -94,7 +97,21 @@ Ok so things look as they should.
 
 Let's try with the actual simulated samples
 ```{r}
+# get a hypervolume for each of the simulation replicates
+#sample_hyps <- samplesize_sim %>%
+sample_hyps <- test_sim %>%
+  select(-x) %>%
+  group_by(simid) %>%
+  group_map(., ~ env_pc %>%
+              filter(ID %in% .x$id) %>%
+              dplyr::select(-ID) %>%
+              hypervolume(), 
+            .keep = TRUE)
 
+# get overlap stats between simulated hypervolumes and the complete environmental hypervolume
+overlap_stats <- map_dfr(sample_hyps, ~hypervolume_set(comp_hyp, .x, check.memory = FALSE) %>%
+                           hypervolume_overlap_statistics()) %>%
+  cbind(simid = unique(test_sim$simid), .)
 ```
 
 
