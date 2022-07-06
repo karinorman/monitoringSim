@@ -22,10 +22,7 @@ library(sampling)
 Load Data
 ```{r}
 load(here::here("data/qc.rda"))
-load(here::here("data/qc_mammals.rda"))
-
 qc_proj <- st_transform(qc, crs = 5070)
-qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
 ```
 
 Set up simulation for Quebec
