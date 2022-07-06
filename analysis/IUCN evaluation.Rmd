@@ -22,6 +22,19 @@ library(raster)
 #devtools::load_all()
 ```
 
+Load data
+```{r}
+load(here::here("data/qc_mammals.rda"))
+qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
+
+load(here::here("data/qc_cand_points.rda"))
+load(here::here("data/samplesize_sim.rda"))
+
+# check if CRS match
+# raster::compareCRS(qc_mammals_proj, qc_cand_points)
+# raster::compareCRS(qc_mammals_proj, samplesize_sim)
+```
+
 Get species counts for each candidate point
 ```{r}
 mammal_specieslist <- st_intersects(qc_cand_points, qc_mammals_proj, prepared = TRUE, sparse = FALSE) %>%

@@ -28,8 +28,8 @@ pts <- qc_cand_points %>% filter(id %in% unique(samplesize_sim$id))
 rm(samplesize_sim)
 
 #check everything is in the same projection
-compareCRS(qc_lc, pts)
-compareCRS(clim_stack, pts)
+raster::compareCRS(qc_lc, pts)
+raster::compareCRS(clim_stack, pts)
 ```
 Get environmental data for each point
 ```{r}
