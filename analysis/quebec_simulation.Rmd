@@ -17,6 +17,8 @@ library(survey)
 library(spsurvey)
 library(BalancedSampling)
 library(sampling)
+
+devtools::load_all()
 ```
 
 Load Data
@@ -49,23 +51,22 @@ get_reps <- function(n, nreps) {
                    print(c(rep, n))
                    get_eqprob(qc_cand_points, n = n) %>% 
                      mutate(rep = rep)
-                 }) %>% 
-    unite("simid", rep, sample_size, algorithm)
-                 
+                 })
 }
 
 # test run
-#samplesize_sim <- purrr::map_dfr(sample_sizes[1:3], ~get_reps(.x, nreps = repn) %>% mutate(sample_size = .x))
+# samplesize_sim <- purrr::map_dfr(sample_sizes[1:3], ~get_reps(.x, nreps = repn) %>% mutate(sample_size = .x))
 
 # Parallelize Version
 #options(future.debug = FALSE)
 #have to source internal functions so the workers can see them
-source("R/get_eqprob.R")
+source(here::here("R/get_eqprob.R"))
 plan("multisession", workers = length(sample_sizes))
 samplesize_sim <- furrr::future_map_dfr(sample_sizes, 
                                         ~get_reps(.x, nreps = repn) %>% mutate(sample_size = .x),
                                         .options = furrr_options(packages = "monitoringSim",  
-                                        seed = TRUE))
+                                        seed = TRUE))  %>% 
+    unite("simid", rep, sample_size, algorithm, remove = FALSE)
 
 usethis::use_data(samplesize_sim)
 ```

@@ -50,13 +50,12 @@ specieslist_long <- mammal_specieslist %>%
   filter(value == TRUE) %>%
   dplyr::select(-value)
 
-
 design_lists <- samplesize_sim %>%
   dplyr::select(-x) %>%
   left_join(specieslist_long, by = "id")
 
 richness_df <- design_lists %>% 
-  dplyr::group_by(rep, algorithm, sample_size) %>%
+  dplyr::group_by(simid, rep, algorithm, sample_size) %>%
   summarize(richness = n_distinct(species, na.rm = TRUE))
 
 richness_stats <- richness_df %>%
@@ -64,7 +63,7 @@ richness_stats <- richness_df %>%
   summarize(mean = mean(richness),
             sd = sd(richness))
 
-ggplot(richness_stats, aes(x = sample_size, y = mean, color = algorithm)) +
+ggplot(richness_stats %>% filter(sample_size <1000), aes(x = sample_size, y = mean, color = algorithm)) +
   geom_line() + 
   labs(y ="Mean Richness", x = "Sample Size") +
   theme_classic()
