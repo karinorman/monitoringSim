@@ -13,6 +13,7 @@ library(hypervolume)
 library(dplyr)
 library(tidyr)
 library(purrr)
+library(sf)
 ```
 
 Get selected points and landcover data
@@ -20,12 +21,12 @@ Get selected points and landcover data
 load(here::here("data/qc_cand_points.rda")) #candidate points
 load(here::here("data/samplesize_sim.rda")) # selected points 
 
-qc_lc <- raster("data/can_lc_proj.tif") # landcover data
+qc_lc <- raster::raster(here::here("data/can_lc_proj.tif")) # landcover data
 load(here::here("data/clim_stack.rda")) # climate stack 
 
 
-pts <- qc_cand_points %>% filter(id %in% unique(samplesize_sim$id))
-rm(samplesize_sim)
+pts <- qc_cand_points %>%
+  filter(id %in% unique(samplesize_sim$id))
 
 #check everything is in the same projection
 raster::compareCRS(qc_lc, pts)
@@ -47,7 +48,6 @@ Look at correlation
 ```
 
 ```{r}
-library(hypervolume)
 
 #PCA of the variables to reduce the dimensionality
 envdata <- envdata_pts %>% 
@@ -98,8 +98,7 @@ Ok so things look as they should.
 Let's try with the actual simulated samples
 ```{r}
 # get a hypervolume for each of the simulation replicates
-#sample_hyps <- samplesize_sim %>%
-sample_hyps <- test_sim %>%
+sample_hyps <- samplesize_sim %>%
   select(-x) %>%
   group_by(simid) %>%
   group_map(., ~ env_pc %>%
