@@ -81,32 +81,7 @@ dist_mat <- as.matrix(dist(qc_cand_points %>%
                              as_tibble() %>%
                              select(-x)))
 
-# test dataframe
-test_sim <- samplesize_sim %>%
-  filter(simid == "1_10_srs")
-
-n <- n_distinct(test_sim$id)
-N <- dim(qc_cand_points)[1]
-
-pik <- rep(n/N,N)
-
-Spbsampling::sbi(dist_mat, pik, test_sim$id)
-
-get_sbi <- function(n, N, id_vec, dist){
-  pik <- rep(n/N,N)
-  
-  metric <- Spbsampling::sbi(dist, pik, id_vec)
-  return(metric)
-}
-
-# mapping version
-
-keep <- samplesize_sim %>%
-  filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
-  group_by(simid) %>%
-  group_map(~as.data.frame(c(rep = unique(.x$rep), sample_size = unique(.x$sample_size), algorithm = unique(.x$algorithm),
-                       sb = get_sbi(n = n_distinct(.x$id), N = dim(dist_mat)[1], id_vec = unique(.x$id), dist = dist_mat))))
-
+# This calculates inclusion probabilities for an equal probability study design
 sb_df <- samplesize_sim %>%
   #filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
   group_by(simid) %>%
