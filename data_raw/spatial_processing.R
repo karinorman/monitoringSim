@@ -51,7 +51,7 @@ usethis::use_data(qc_mammals)
 ##################
 
 #### WWF ecoregions ####
-ecoreg <- st_read(here::here("data_store/wwf_ecoregions/wwf_terr_ecos.shp"))
+ecoreg <- st_read(here::here("data/wwf_ecoregions/wwf_terr_ecos.shp"))
 
 ########################
 

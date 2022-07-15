@@ -43,6 +43,7 @@ qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
 usethis::use_data(qc_cand_points)
 ```
 
+## Equal probability sampling
 ```{r}
 ##FIXME probably move this function out of the script and name it more usefully
 get_reps <- function(n, nreps) {
@@ -70,4 +71,68 @@ samplesize_sim <- furrr::future_map_dfr(sample_sizes,
 
 usethis::use_data(samplesize_sim)
 ```
+
+## Stratified Equal Probability sampling
+```{r}
+library(sf)
+
+#get ecoregion data
+ecoreg <- st_read(here::here("data/wwf_ecoregions/wwf_terr_ecos.shp")) %>%
+  st_transform(ecoreg, crs = 5070) %>%
+  st_make_valid()
+
+# make sure CRS matches candidate points
+raster::compareCRS(ecoreg, qc_cand_points)
+
+# get the ecoregion for each point
+ecoreg_pts <- st_intersection(qc_cand_points, ecoreg)
+```
+
+How many points are in each ecoregion? Exclude ecoregions with very few points
+```{r}
+inc_ecoreg_pts <- ecoreg_pts %>% 
+  count(ECO_NUM) %>%
+  filter(n > 10)
+```
+
+What area does each ecoregion cover?
+```{r}
+#clip the shapefile to quebec (study frame) to get are
+ecoreg_qc <- st_intersection(ecoreg, qc_proj)
+ecoreg_qc$AREA <- st_area(ecoreg_qc)
+
+#https://stackoverflow.com/questions/69539592/calculate-the-surface-area-of-a-variable-in-a-shapefile-in-r#:~:text=Load%20your%20multipolygon%20in%20R,(row)%20in%20your%20multipolygon.&text=%3E%20df2,%3D%20%22id%22%2C%20all.
+
+ecoreg_areas <- ecoreg_qc %>% 
+  filter(ECO_NUM %in% ecoreg_pts$ECO_NUM) %>% #exclude regions with too few points
+  group_by(ECO_NUM) %>% 
+  summarize(st_union(geometry), 
+            area_NAME = sum(AREA)) %>%
+  mutate(PERC_AREA = area_NAME/sum(area_NAME))
+
+```
+
+SRS with stratification by ecoregion
+```{r}
+inc_pts <- ecoreg_pts %>% filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM)
+
+num_strata <- n_distinct(inc_pts$ECO_NUM)
+
+equal_samp <- rep(n/num_strata, num_strata)
+prop_samp <- ecoreg_areas %>% 
+  mutate(sample_size = round(PERC_AREA * n)) %>%
+  arrange(ECO_NUM)
+  
+strata(inc_pts, 
+                 stratanames = c("ECO_NUM"), 
+                 size = equal_samp, method = "srswr")
+
+# make sure the stratification variable is in the same order for data and sample sizes
+strata(data = inc_pts %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
+                 size = as.integer(prop_samp$sample_size), method = "srswr")
+
+```
+
+
+
 
