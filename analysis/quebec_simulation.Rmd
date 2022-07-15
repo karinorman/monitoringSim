@@ -112,25 +112,96 @@ ecoreg_areas <- ecoreg_qc %>%
 
 ```
 
-SRS with stratification by ecoregion
+Format ecoregion and point data
 ```{r}
-inc_pts <- ecoreg_pts %>% filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM)
+inc_pts <- ecoreg_pts %>% filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM) %>%
+  arrange(id)
 
 num_strata <- n_distinct(inc_pts$ECO_NUM)
 
 equal_samp <- rep(n/num_strata, num_strata)
 prop_samp <- ecoreg_areas %>% 
-  mutate(sample_size = round(PERC_AREA * n)) %>%
+  mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
   arrange(ECO_NUM)
-  
+
+#get count of points in each ecoregion (N_stratum)
+stratum_counts <- inc_pts %>%
+  count(ECO_NUM, name = "N") %>%
+  st_drop_geometry()
+
+prop_samp %<>% 
+  left_join(stratum_counts) %>%
+  mutate(inc_prop = sample_size/N)
+
+inc_pts %<>% 
+  left_join(st_drop_geometry(prop_samp))%>%
+  arrange(id)
+```
+
+SRS with stratification by ecoregion
+```{r}
+
 strata(inc_pts, 
                  stratanames = c("ECO_NUM"), 
                  size = equal_samp, method = "srswr")
 
 # make sure the stratification variable is in the same order for data and sample sizes
-strata(data = inc_pts %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
+srs_strat <- strata(data = inc_pts %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
                  size = as.integer(prop_samp$sample_size), method = "srswr")
 
+```
+GRTS algorithm
+
+```{r}
+strata_n <- prop_samp %>%
+  select(ECO_NUM, sample_size) %>%
+  st_drop_geometry() %>%
+  tibble::deframe()
+
+grts_strat <- grts(inc_pts, n_base = strata_n, stratum_var = "ECO_NUM")
+
+selected_sites <- grts_strat$sites_base
+```
+
+Cube sampling
+```{r}
+#library(BalancedSampling)
+
+N <- n_distinct(inc_pts$id)
+coord_mat <- as.matrix(sf::st_coordinates(inc_pts)[,1], sf::st_coordinates(inc_pts)[,2])
+prob_vec <- inc_pts$inc_prop
+
+cube_strat <- cubestratified(prob = prob_vec, Xbal = coord_mat, integerStrata = inc_pts$ECO_NUM)
+```
+
+Both SCPS and LPM do not have built in stratification approaches, so we'll brute force it
+```{r}
+scps_strat <- inc_pts %>%
+  group_by(ECO_NUM) %>%
+  group_map(~{
+    prob <- .x$inc_prop
+    x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    
+    return(scps(prob, x))
+  })
+
+lpm1_strat <- inc_pts %>%
+  group_by(ECO_NUM) %>%
+  group_map(~{
+    prob <- .x$inc_prop
+    x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    
+    return(lpm1(prob, x))
+  })
+
+lpm2_strat <- inc_pts %>%
+  group_by(ECO_NUM) %>%
+  group_map(~{
+    prob <- .x$inc_prop
+    x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    
+    return(lpm2(prob, x))
+  })
 ```
 
 
