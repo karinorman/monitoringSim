@@ -45,7 +45,6 @@ usethis::use_data(qc_cand_points)
 
 ## Equal probability sampling
 ```{r}
-
 # test run
 # N <- dim(qc_cand_points)[1]
 # samplesize_sim <- purrr::map_dfr(sample_sizes[1:2], ~get_eqprop_reps(.x, N = N, pt_df = qc_cand_points, nreps = 2) %>% mutate(sample_size = .x))
@@ -113,14 +112,17 @@ Format ecoregion and point data
 ```{r}
 inc_pts <- ecoreg_pts %>% 
   filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM) %>% #exclude ecoregions with too few points
-  arrange(id)
+  arrange(id) %>%
+  left_join(ecoreg_areas %>%
+              st_drop_geometry() %>%
+              select(ECO_NUM, PERC_AREA))
 
-#get count of points in each ecoregion (N_stratum)
-stratum_counts <- inc_pts %>%
-  count(ECO_NUM, name = "N") %>%
-  st_drop_geometry()
-
-num_strata <- n_distinct(inc_pts$ECO_NUM)
+# #get count of points in each ecoregion (N_stratum)
+# stratum_counts <- inc_pts %>%
+#   count(ECO_NUM, name = "N") %>%
+#   st_drop_geometry()
+# 
+# num_strata <- n_distinct(inc_pts$ECO_NUM)
 
 equal_samp <- rep(n/num_strata, num_strata)
 prop_samp <- ecoreg_areas %>% 
@@ -138,27 +140,11 @@ usethis::use_data(ecoregion_points_data)
 Stratification function
 ```{r}
 # need to fix hardcoding of column names
-get_eqprob_strat <- function(pt_df, n, N){
+get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
   
-  # process ecoregion dataframe #
-  #get count of points in each ecoregion (N_stratum)
-  stratum_counts <- inc_pts %>%
-    count(ECO_NUM, name = "N") %>%
-    st_drop_geometry()
-  
-  num_strata <- n_distinct(inc_pts$ECO_NUM)
-  
-  N <- n_distinct(pt_df$id)
-  coord_mat <- as.matrix(sf::st_coordinates(inc_pts)[,1], sf::st_coordinates(inc_pts)[,2])
-  prob_vec <- pt_df$inc_prop
-  
-    strata_n <- pt_df %>%
-    st_drop_geometry() %>%
-    select(ECO_NUM, sample_size) %>%
-    distinct() %>%
-    tibble::deframe()
-    
-  strata_n <- strata_n[order(as.integer(names(strata_n)))]
+  #### What of the commenting below needs to be moved out?? ####
+  # 
+
   
   #simple random sampling stratified
   srs <- sampling::strata(data = pt_df %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
@@ -168,7 +154,7 @@ get_eqprob_strat <- function(pt_df, n, N){
   grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = "ECO_NUM")
   
   # CUBE
-  cube_strat <- BalancedSampling::cubestratified(prob = prob_vec, Xbal = coord_mat, integerStrata = inc_pts$ECO_NUM)
+  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = strat_df, integerStrata = inc_pts$ECO_NUM)
   
   # SCPS
   scps_strat <- pt_df %>%
@@ -205,6 +191,51 @@ get_eqprob_strat <- function(pt_df, n, N){
     left_join(pt_df)
 }
 
+```
+
+```{r}
+get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
+  
+  pt_mat <- as.matrix(cbind(sf::st_coordinates(strat_df)[,1],
+                            sf::st_coordinates(strat_df)[,2]))
+    
+  #get count of number of points in each stratum
+  stratum_counts <- strat_df %>%
+    count({{strata_col}}, name = "N") %>%
+    st_drop_geometry()
+  
+  num_strata <- dim(stratum_counts)[1]
+
+  #equal_samp <- rep(n/num_strata, num_strata)
+  prop_samp <- strat_df %>% 
+    select({{strat_col}}, {{area_col}}) %>%
+    distinct() %>%
+    mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
+    left_join(stratum_counts) %>%
+    mutate(inc_prob = sample_size/N)
+
+  ecoregion_pts <- strat_df %>%
+    left_join(st_drop_geometry(prop_samp))
+  
+  # calculate the bespoke things each algorithm needs
+  pik <- ecoregion_pts$inc_prob
+  
+  strata_n <- ecoregion_pts %>%
+    st_drop_geometry() %>%
+    select({{strata_col}}, sample_size) %>%
+    distinct() %>%
+    tibble::deframe()
+
+  strata_n <- strata_n[order(as.integer(names(strata_n)))]
+
+  purrr::map_dfr(1:nreps,
+                 function(rep) {
+                   print(c(rep, n))
+                   get_eqprob_strat(pt_df = ecoregion_pts, pt_mat = pt_mat, pik = pik,
+                              n = n, N = N, strata_n = strata_n) %>%
+                     mutate(rep = rep)
+                 })
+}
 ```
 
 SRS with stratification by ecoregion
