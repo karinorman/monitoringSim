@@ -4,43 +4,29 @@
 #' @param n number of sites to be selected
 #'
 #' @return list of point indexes for each algorithm
-get_eqprob <- function(sf_df, n) {
-
-  N <- dim(sf_df)[1]
-  pik <- rep(n/N,N) #vector of inclusion probabilities
-
-  x <- as.matrix(cbind(sf::st_coordinates(sf_df)[,1],
-                       sf::st_coordinates(sf_df)[,2]))
-
-  # #get matrix of vertices for a bounding box of the sample area
-  # bb <- st_bbox(sf_df)
-  # bmat <- matrix(c(bb$xmin, bb$ymin,
-  #                  bb$xmin, bb$ymax,
-  #                  bb$xmax, bb$ymax,
-  #                  bb$xmax, bb$ymax),
-  #                ncol = 2, byrow = TRUE)
+get_eqprob <- function(sf_df, pt_mat, n, pik) {
 
   #Simple random sample
-  srs <- srswor(n, N)
+  srs <- sampling::srswor(n, N)
 
   #GRTS
-  grts_fit <- grts(sf_df, n_base = n)
+  grts_fit <- spsurvey::grts(sf_df, n_base = n)
 
   #Cube sampling
-  cube_fit <- samplecube(x, pik, comment = TRUE, method = 1)
+  cube_fit <- BalancedSampling::cube(pik, pt_mat)
 
   #SCPS
-  scps_fit <- scps(pik, x)
+  scps_fit <- BalancedSampling::scps(pik, pt_mat)
 
   #LPM
-  lpm1_fit <- lpm1(pik, x)
-  lpm2_fit <- lpm2(pik, x)
+  lpm1_fit <- BalancedSampling::lpm1(pik, pt_mat)
+  lpm2_fit <- BalancedSampling::lpm2(pik, pt_mat)
 
   # #BAS
-  # bas_fit <- quasiSamp(n, dimension = 2, potential.sites = x,
+  # bas_fit <- quasiSamp(n, dimension = 2, potential.sites = pt_mat,
   #                      study.area = bmat, inclusion.probs = pik)
 
-  list(srs = which(srs == 1), grts = grts_fit$sites_base$id, cube = which(cube_fit == 1),
+  list(srs = which(srs == 1), grts = grts_fit$sites_base$id, cube = cube_fit,
        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
     rename(id = `.x`) %>%
