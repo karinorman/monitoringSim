@@ -86,6 +86,8 @@ raster::compareCRS(ecoreg, qc_cand_points)
 
 # get the ecoregion for each point
 ecoreg_pts <- st_intersection(qc_cand_points, ecoreg)
+
+usethis::use_data(ecoreg_pts)
 ```
 
 How many points are in each ecoregion? Exclude ecoregions with very few points
@@ -114,28 +116,100 @@ ecoreg_areas <- ecoreg_qc %>%
 
 Format ecoregion and point data
 ```{r}
-inc_pts <- ecoreg_pts %>% filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM) %>%
+inc_pts <- ecoreg_pts %>% 
+  filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM) %>% #exclude ecoregions with too few points
   arrange(id)
-
-num_strata <- n_distinct(inc_pts$ECO_NUM)
-
-equal_samp <- rep(n/num_strata, num_strata)
-prop_samp <- ecoreg_areas %>% 
-  mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
-  arrange(ECO_NUM)
 
 #get count of points in each ecoregion (N_stratum)
 stratum_counts <- inc_pts %>%
   count(ECO_NUM, name = "N") %>%
   st_drop_geometry()
 
-prop_samp %<>% 
+num_strata <- n_distinct(inc_pts$ECO_NUM)
+
+equal_samp <- rep(n/num_strata, num_strata)
+prop_samp <- ecoreg_areas %>% 
+  mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
   left_join(stratum_counts) %>%
   mutate(inc_prop = sample_size/N)
 
-inc_pts %<>% 
+ecoregion_points_data <- inc_pts %>%
   left_join(st_drop_geometry(prop_samp))%>%
   arrange(id)
+
+usethis::use_data(ecoregion_points_data)
+```
+
+Stratification function
+```{r}
+# need to fix hardcoding of column names
+get_eqprob_strat <- function(pt_df, n, N){
+  
+  # process ecoregion dataframe #
+  #get count of points in each ecoregion (N_stratum)
+  stratum_counts <- inc_pts %>%
+    count(ECO_NUM, name = "N") %>%
+    st_drop_geometry()
+  
+  num_strata <- n_distinct(inc_pts$ECO_NUM)
+  
+  N <- n_distinct(pt_df$id)
+  coord_mat <- as.matrix(sf::st_coordinates(inc_pts)[,1], sf::st_coordinates(inc_pts)[,2])
+  prob_vec <- pt_df$inc_prop
+  
+    strata_n <- pt_df %>%
+    st_drop_geometry() %>%
+    select(ECO_NUM, sample_size) %>%
+    distinct() %>%
+    tibble::deframe()
+    
+  strata_n <- strata_n[order(as.integer(names(strata_n)))]
+  
+  #simple random sampling stratified
+  srs <- sampling::strata(data = pt_df %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
+                size = strata_n, method = "srswr")
+  
+  # GRTS
+  grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = "ECO_NUM")
+  
+  # CUBE
+  cube_strat <- BalancedSampling::cubestratified(prob = prob_vec, Xbal = coord_mat, integerStrata = inc_pts$ECO_NUM)
+  
+  # SCPS
+  scps_strat <- pt_df %>%
+    group_by(ECO_NUM) %>%
+    group_map(~{
+      prob <- .x$inc_prop
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::scps(prob, x))
+    }) %>% unlist()
+  
+  lpm1_strat <- pt_df %>%
+    group_by(ECO_NUM) %>%
+    group_map(~{
+      prob <- .x$inc_prop
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::lpm1(prob, x))
+    }) %>% unlist()
+  
+  lpm2_strat <- pt_df %>%
+    group_by(ECO_NUM) %>%
+    group_map(~{
+      prob <- .x$inc_prop
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::lpm2(prob, x))
+    }) %>% unlist()
+  
+  list(srs = which(srs == 1), grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
+       scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
+    map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
+    rename(id = `.x`) %>%
+    left_join(pt_df)
+}
+
 ```
 
 SRS with stratification by ecoregion
