@@ -33,4 +33,25 @@ get_eqprob <- function(sf_df, pt_mat, n, pik) {
     left_join(sf_df)
 }
 
+#' Simulate Equal probability reps
+#'
+#' @param n number of sites to be selected
+#' @param N total number of potential sites
+#' @param pt_df sf dataframe of potential sites
+#' @param nreps number of simulated replicates
+#'
+#' @return returns a long-form dataframe of sample points for each replicate and algorithm
+get_eqprop_reps <- function(n, N, pt_df, nreps) {
 
+  pik <- rep(n/N,N) #vector of inclusion probabilities
+  pt_mat <- as.matrix(cbind(sf::st_coordinates(pt_df)[,1],
+                            sf::st_coordinates(pt_df)[,2]))
+
+  purrr::map_dfr(1:nreps,
+                 function(rep) {
+                   print(c(rep, n))
+                   get_eqprob(sf_df = pt_df, pt_mat = pt_mat,
+                              n = n, pik = pik) %>%
+                     mutate(rep = rep)
+                 })
+}

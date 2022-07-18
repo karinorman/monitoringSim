@@ -45,21 +45,6 @@ usethis::use_data(qc_cand_points)
 
 ## Equal probability sampling
 ```{r}
-##FIXME probably move this function out of the script and name it more usefully
-get_eqprop_reps <- function(n, N, pt_df, nreps) {
-  
-   pik <- rep(n/N,N) #vector of inclusion probabilities
-   pt_mat <- as.matrix(cbind(sf::st_coordinates(pt_df)[,1],
-                       sf::st_coordinates(pt_df)[,2]))
-   
-   purrr::map_dfr(1:nreps, 
-                 function(rep) {
-                   print(c(rep, n))
-                   get_eqprob(sf_df = pt_df, pt_mat = pt_mat,
-                              n = n, pik = pik) %>% 
-                     mutate(rep = rep)
-                 })
-}
 
 # test run
 # N <- dim(qc_cand_points)[1]
