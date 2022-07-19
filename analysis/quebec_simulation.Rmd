@@ -141,11 +141,7 @@ Stratification function
 ```{r}
 # need to fix hardcoding of column names
 get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
-  
-  #### What of the commenting below needs to be moved out?? ####
-  # 
 
-  
   #simple random sampling stratified
   srs <- sampling::strata(data = pt_df %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
                 size = strata_n, method = "srswr")
@@ -154,13 +150,13 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
   grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = "ECO_NUM")
   
   # CUBE
-  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = strat_df, integerStrata = inc_pts$ECO_NUM)
+  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = inc_pts$ECO_NUM)
   
   # SCPS
   scps_strat <- pt_df %>%
     group_by(ECO_NUM) %>%
     group_map(~{
-      prob <- .x$inc_prop
+      prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
       
       return(BalancedSampling::scps(prob, x))
@@ -169,7 +165,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
   lpm1_strat <- pt_df %>%
     group_by(ECO_NUM) %>%
     group_map(~{
-      prob <- .x$inc_prop
+      prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
       
       return(BalancedSampling::lpm1(prob, x))
@@ -178,7 +174,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
   lpm2_strat <- pt_df %>%
     group_by(ECO_NUM) %>%
     group_map(~{
-      prob <- .x$inc_prop
+      prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
       
       return(BalancedSampling::lpm2(prob, x))
@@ -195,9 +191,6 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
 
 ```{r}
 get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
-  
-  pt_mat <- as.matrix(cbind(sf::st_coordinates(strat_df)[,1],
-                            sf::st_coordinates(strat_df)[,2]))
     
   #get count of number of points in each stratum
   stratum_counts <- strat_df %>%
@@ -208,34 +201,56 @@ get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
 
   #equal_samp <- rep(n/num_strata, num_strata)
   prop_samp <- strat_df %>% 
-    select({{strat_col}}, {{area_col}}) %>%
+    select({{strata_col}}, {{area_col}}) %>%
+    st_drop_geometry() %>%
     distinct() %>%
-    mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
+    mutate(sample_size = as.integer(round({{area_col}} * n))) %>%
     left_join(stratum_counts) %>%
     mutate(inc_prob = sample_size/N)
 
   ecoregion_pts <- strat_df %>%
-    left_join(st_drop_geometry(prop_samp))
+    left_join(prop_samp %>%
+                select(-{{area_col}}) %>%
+                distinct())
   
-  # calculate the bespoke things each algorithm needs
-  pik <- ecoregion_pts$inc_prob
-  
-  strata_n <- ecoregion_pts %>%
+  strata_df <- ecoregion_pts %>%
     st_drop_geometry() %>%
     select({{strata_col}}, sample_size) %>%
-    distinct() %>%
-    tibble::deframe()
+    distinct() 
 
-  strata_n <- strata_n[order(as.integer(names(strata_n)))]
+  missing_ecoregion <- strata_df %>% filter(sample_size == 0)
+  
+  if(dim(missing_ecoregion)[1] > 0){
+    warning(paste0("There are ", dim(missing_ecoregion)[1], " ecoregions that have not been allocated any samples."))
+    
+    ecoregion_pts <- ecoregion_pts %>% 
+      filter(!ECO_NUM %in% missing_ecoregion$ECO_NUM)
+    
+    strata_df <- filter(strata_df, sample_size != 0)
+  }
+  
+  # calculate the bespoke things each algorithm needs
+  strata_n <- strata_df %>%
+    arrange(ECO_NUM) %>%
+    tibble::deframe() 
+  
+  pik <- ecoregion_pts$inc_prob
+    
+  pt_mat <- as.matrix(cbind(sf::st_coordinates(ecoregion_pts)[,1],
+                            sf::st_coordinates(ecoregion_pts)[,2]))
 
   purrr::map_dfr(1:nreps,
                  function(rep) {
                    print(c(rep, n))
+                   #pt_df, pt_mat, pik, n, N, strata_n
                    get_eqprob_strat(pt_df = ecoregion_pts, pt_mat = pt_mat, pik = pik,
                               n = n, N = N, strata_n = strata_n) %>%
                      mutate(rep = rep)
                  })
 }
+
+purrr::map_dfr(sample_sizes[2:3], ~get_strata_reps(.x, N = N, strat_df = inc_pts, 
+                                                   nreps = 2, strata_col = ECO_NUM, area_col = PERC_AREA) %>% mutate(sample_size = .x))
 ```
 
 SRS with stratification by ecoregion
