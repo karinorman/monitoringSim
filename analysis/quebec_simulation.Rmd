@@ -164,8 +164,9 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
   list(srs = which(srs == 1), grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
        scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
-    rename(id = `.x`) %>%
-    left_join(pt_df)
+    rename(tempid = `.x`) %>%
+    left_join(pt_df) %>% 
+    select(-tempid)
 }
 
 ```
@@ -180,29 +181,34 @@ get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
   
   num_strata <- dim(stratum_counts)[1]
 
+  # get inclusion probabilities for samples proportional to stratum size 
   #equal_samp <- rep(n/num_strata, num_strata)
   prop_samp <- strat_df %>% 
     select({{strata_col}}, {{area_col}}) %>%
     st_drop_geometry() %>%
     distinct() %>%
-    mutate(sample_size = as.integer(round({{area_col}} * n))) %>%
+    mutate(sample_size = as.integer(round({{area_col}} * n))) %>% # get number of samples per strata
     left_join(stratum_counts) %>%
-    mutate(inc_prob = sample_size/N)
+    mutate(inc_prob = sample_size/N) # calculate inclusion probabilities 
 
+  # add inclusion probabilites and sample sizes back to the original dataframe
   ecoregion_pts <- strat_df %>%
     left_join(prop_samp %>%
                 select(-{{area_col}}) %>%
                 distinct())
   
+  # get sample size for each strata
   strata_df <- ecoregion_pts %>%
     st_drop_geometry() %>%
     select({{strata_col}}, sample_size) %>%
     distinct() 
-
+  
+  # dataframe of stratum with no samples allocated
   missing_ecoregion <- strata_df %>% filter(sample_size == 0)
   
+  # warn that some ecoregions don't have samples, drop those samples from the dataframe
   if(dim(missing_ecoregion)[1] > 0){
-    warning(paste0("There are ", dim(missing_ecoregion)[1], " ecoregions that have not been allocated any samples."))
+    warning(paste0("There are ", dim(missing_ecoregion)[1], " ecoregions that have not been allocated any samples for sample size ", n, "."))
     
     ecoregion_pts <- ecoregion_pts %>% 
       filter(!ECO_NUM %in% missing_ecoregion$ECO_NUM)
@@ -211,14 +217,22 @@ get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
   }
   
   # calculate the bespoke things each algorithm needs
+  
+  # named list of sample sizes
   strata_n <- strata_df %>%
     arrange(ECO_NUM) %>%
     tibble::deframe() 
   
+  # vector of inclusion probabilities
   pik <- ecoregion_pts$inc_prob
-    
+  
+  # matrix of coordinates  
   pt_mat <- as.matrix(cbind(sf::st_coordinates(ecoregion_pts)[,1],
                             sf::st_coordinates(ecoregion_pts)[,2]))
+  
+  # make sure there's a complete ID column even if we had to drop data
+  ecoregion_pts <- ecoregion_pts %>%
+    mutate(tempid = row_number())
 
   purrr::map_dfr(1:nreps,
                  function(rep) {
@@ -230,7 +244,7 @@ get_strata_reps <- function(n, N, strat_df, nreps, strata_col, area_col) {
                  })
 }
 
-purrr::map_dfr(sample_sizes[2:3], ~get_strata_reps(.x, N = N, strat_df = inc_pts, 
+test <- purrr::map_dfr(sample_sizes[1:2], ~get_strata_reps(.x, N = N, strat_df = inc_pts, 
                                                    nreps = 2, strata_col = ECO_NUM, area_col = PERC_AREA) %>% mutate(sample_size = .x))
 ```
 
