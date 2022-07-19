@@ -35,7 +35,8 @@ n <- 100
 repn <- 100
 
 #list of sample sizes
-sample_sizes <- c(10, 20, 50, 100, 500, 1000, 5000)
+#sample_sizes <- c(10, 20, 50, 100, 500, 1000, 5000)
+sample_sizes <- c(10, 20, 50, 100, 500, 1000)
 
 # to get more candidate points (increase N), larger pt_density 
 qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
@@ -116,30 +117,10 @@ inc_pts <- ecoreg_pts %>%
   left_join(ecoreg_areas %>%
               st_drop_geometry() %>%
               select(ECO_NUM, PERC_AREA))
-
-# #get count of points in each ecoregion (N_stratum)
-# stratum_counts <- inc_pts %>%
-#   count(ECO_NUM, name = "N") %>%
-#   st_drop_geometry()
-# 
-# num_strata <- n_distinct(inc_pts$ECO_NUM)
-
-equal_samp <- rep(n/num_strata, num_strata)
-prop_samp <- ecoreg_areas %>% 
-  mutate(sample_size = as.integer(round(PERC_AREA * n))) %>%
-  left_join(stratum_counts) %>%
-  mutate(inc_prop = sample_size/N)
-
-ecoregion_points_data <- inc_pts %>%
-  left_join(st_drop_geometry(prop_samp))%>%
-  arrange(id)
-
-usethis::use_data(ecoregion_points_data)
 ```
 
 Stratification function
 ```{r}
-# need to fix hardcoding of column names
 get_eqprob_strat <- function(pt_df, pt_mat, pik, n, N, strata_n){
 
   #simple random sampling stratified
