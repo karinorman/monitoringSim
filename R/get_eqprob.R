@@ -28,7 +28,7 @@ get_eqprob <- function(sf_df, pt_mat, n, pik) {
 
   list(srs = which(srs == 1), grts = grts_fit$sites_base$id, cube = cube_fit,
        scps = scps_fit, lpm1 = lpm1_fit, lpm2 = lpm2_fit) %>%
-    map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
+    purrr::map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
     rename(id = `.x`) %>%
     left_join(sf_df)
 }

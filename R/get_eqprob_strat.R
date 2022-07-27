@@ -17,7 +17,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n){
   grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = "ECO_NUM")
 
   # CUBE
-  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = inc_pts$ECO_NUM)
+  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pt_df$ECO_NUM)
 
   # SCPS
   scps_strat <- pt_df %>%
@@ -47,7 +47,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n){
       return(BalancedSampling::lpm2(prob, x))
     }) %>% unlist()
 
-  list(srs = which(srs == 1), grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
+  list(srs = srs$ID_unit, grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
        scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
     rename(tempid = `.x`) %>%
