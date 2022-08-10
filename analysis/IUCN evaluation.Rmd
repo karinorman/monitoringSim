@@ -17,7 +17,8 @@ library(spsurvey)
 library(BalancedSampling)
 library(ggplot2)
 library(sampling)
-library(raster)
+library(purrr)
+#library(raster)
 
 #devtools::load_all()
 ```
@@ -29,10 +30,18 @@ qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
 
 load(here::here("data/qc_cand_points.rda"))
 load(here::here("data/samplesize_sim.rda"))
+load(here::here("data/strata_sim.rda"))
 
 # check if CRS match
 # raster::compareCRS(qc_mammals_proj, qc_cand_points)
 # raster::compareCRS(qc_mammals_proj, samplesize_sim)
+
+# one big happy dataframe
+# sim_designs <- bind_rows(samplesize_sim %>%
+#                            mutate(type = "equal_probability"),
+#                          strata_sim %>%
+#                            select(colnames(samplesize_sim), inc_prob) %>% 
+#                            mutate(type = "stratified"))
 ```
 
 Get species counts for each candidate point
@@ -50,36 +59,61 @@ specieslist_long <- mammal_specieslist %>%
   filter(value == TRUE) %>%
   dplyr::select(-value)
 
-design_lists <- samplesize_sim %>%
-  dplyr::select(-x) %>%
-  left_join(specieslist_long, by = "id")
-
-richness_df <- design_lists %>% 
-  dplyr::group_by(simid, rep, algorithm, sample_size) %>%
-  summarize(richness = n_distinct(species, na.rm = TRUE))
-
-richness_stats <- richness_df %>%
-  group_by(algorithm, sample_size) %>%
-  summarize(mean = mean(richness),
+richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_sim), ~ {
+  design_lists <- .x %>%
+    dplyr::select(-x) %>%
+    left_join(specieslist_long, by = "id")
+  
+  richness_df <- design_lists %>% 
+    dplyr::group_by(simid, rep, algorithm, sample_size) %>%
+    summarize(richness = n_distinct(species, na.rm = TRUE))
+  
+  richness_stats <- richness_df %>%
+    group_by(algorithm, sample_size) %>%
+    summarize(mean = mean(richness),
             sd = sd(richness))
+})
 
-ggplot(richness_stats %>% filter(sample_size <1000), aes(x = sample_size, y = mean, color = algorithm)) +
+eqprob_species_plot <- ggplot(richness_dfs$samplesize_sim %>% filter(sample_size <5000), 
+                              aes(x = sample_size, y = mean, color = algorithm)) +
   geom_line() + 
   labs(y ="Mean Richness", x = "Sample Size") +
   theme_classic()
  # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
 
-ggsave("figures/ex_richness_sat.jpg", width = 5, height = 3.5, units = "in")
+strata_species_plot <- ggplot(richness_dfs$strata_sim, aes(x = sample_size, y = mean, color = algorithm)) +
+  geom_line() + 
+  labs(y ="Mean Richness", x = "Sample Size") +
+  theme_classic()
+ # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
+
+#ggsave("figures/ex_richness_sat.jpg", width = 5, height = 3.5, units = "in")
 ```
 
 Get spatial balance metric for each rep
 ```{r}
+load(here::here("data/ecoregion_pts.rda"))
+
 # use the `Spbsampling` function
 dist_mat <- as.matrix(dist(qc_cand_points %>% 
                              dplyr::mutate(lon = sf::st_coordinates(.)[,1], 
                                            lat = sf::st_coordinates(.)[,2]) %>%
                              as_tibble() %>%
                              select(-x)))
+
+samplesize_sim <- samplesize_sim %>%
+  group_by(sample_size) %>%
+  mutate(inc_prob = sample_size/n_distinct(qc_cand_points$id))
+
+# get dataframes of inclusion probabilities
+# eqprob_pik<- samplesize_sim %>% 
+#   select(sample_size) %>%
+#   distinct() %>%
+#   mutate(inc_prob = sample_size/n_distinct(qc_cand_points$id))
+# 
+# strata_pik <- strata_sim %>%
+#   select(inc_prob, ECO_NUM, sample_size) %>%
+#   distinct()
 
 # This calculates inclusion probabilities for an equal probability study design
 sb_df <- samplesize_sim %>%
@@ -97,5 +131,11 @@ sb_df <- samplesize_sim %>%
       distinct() %>%
       mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
   })
+
+sb_balance <- function(data, samples_df){
+  samples_df %>%
+    select(sample_size, inc_prob, contains("ECO_NUM")) %>%
+    distinct()
+}
 ```
 
