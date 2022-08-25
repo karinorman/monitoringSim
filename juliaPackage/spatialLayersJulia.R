@@ -1,6 +1,9 @@
 library("gdalcubes")
 library("rstac")
 library("tibble")
+library(httr)
+library(dplyr)
+library(purrr)
 
 s = stac("https://io.biodiversite-quebec.ca/stac/")
 srs_cube <- "EPSG:6623"
@@ -82,3 +85,27 @@ rc <- raster_cube(st_ghmts, v)
 rc  %>% plot()
 
 rc %>% write_tif(dir = here::here("juliaPackage/"), prefix = "ghmts")
+
+
+### Upload to zenodo ####
+# get your token here
+# https://zenodo.org/account/settings/applications/
+#token <- put_token_here
+deposit_id <- 7023280 # fill in UI form to get this number
+files <- list.files( here::here("juliaPackage"))
+file_path <- here::here("juliaPackage", files)
+
+bucket <- GET(paste0("https://www.zenodo.org/api/deposit/depositions/",deposit_id),
+              add_headers(Authorization = paste("Bearer", token)),
+              encode = 'json'
+) %>%
+  content(as = "text") %>%
+  jsonlite::fromJSON() %>%
+  pluck("links") %>%
+  pluck("bucket") %>%
+  gsub("https://zenodo.org/api/files/","",.)
+
+map2(files, file_path, ~PUT(url = paste0("https://www.zenodo.org/api/files/",bucket,"/",.x,"?access_token=",token),
+    body = upload_file(.y) # path to your local file
+) %>%
+  content(as = "text"))
