@@ -16,7 +16,7 @@ cdn <- getData("GADM",country="can",level=0) %>%
 usethis::use_data(cdn)
 
 # Quebec
-cdn_regions <- getData("GADM",country="can",level=1) %>%
+cdn_regions <- raster::getData("GADM",country="can",level=1) %>%
   st_as_sf()
 
 qc <- cdn_regions %>% filter(NAME_1 == "Québec") %>%

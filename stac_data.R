@@ -1,4 +1,5 @@
 #### STAC access ####
+#https://github.com/ReseauBiodiversiteQuebec/stac-catalogue/tree/main/vignettes
 #devtools::install_github("ReseauBiodiversiteQuebec/stac-catalogue")
 library("stacatalogue")
 library("rstac")
