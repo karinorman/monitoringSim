@@ -113,4 +113,7 @@ load(here::here("data/qc_cand_points.rda"))
 qc_cand_proj <- qc_cand_points %>%
   st_transform(crs = 6623)
 
-env_pts_data <- raster::extract(env_stack, qc_cand_proj, df = TRUE)
+env_pts_data <- raster::extract(env_stack, qc_cand_proj, df = TRUE) %>%
+  left_join(qc_cand_points, by = c("ID" = "id"))
+
+usethis::use_data(env_pts_data)
