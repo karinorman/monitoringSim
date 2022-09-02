@@ -25,7 +25,7 @@ library(purrr)
 
 ```{r}
 load(here::here("data/qc_cand_points.rda"))
-load(here::here("data/ecoregion_pts.rda"))
+load(here::here("data/ecoreg_pts.rda"))
 load(here::here("data/samplesize_sim.rda"))
 load(here::here("data/strata_sim.rda"))
 
@@ -47,26 +47,13 @@ dist_mat <- as.matrix(dist(qc_cand_points %>%
                              as_tibble() %>%
                              select(-x)))
 
-samplesize_sim <- samplesize_sim %>%
-  group_by(sample_size) %>%
-  mutate(inc_prob = sample_size/n_distinct(qc_cand_points$id))
-
-# get dataframes of inclusion probabilities
-# eqprob_pik<- samplesize_sim %>% 
-#   select(sample_size) %>%
-#   distinct() %>%
-#   mutate(inc_prob = sample_size/n_distinct(qc_cand_points$id))
-# 
-# strata_pik <- strata_sim %>%
-#   select(inc_prob, ECO_NUM, sample_size) %>%
-#   distinct()
-
-# This calculates inclusion probabilities for an equal probability study design
+# This calculates inclusion probabilities and spatial balance metric for an equal probability study design
 sb_df <- samplesize_sim %>%
   #filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
   group_by(simid) %>%
   group_map(~{
-    n <- n_distinct(.x$id)
+    n <- unique(.x$sample_size)
+    print(n)
     N <- dim(dist_mat)[1]
     pik <- rep(n/N,N)
     
@@ -76,11 +63,34 @@ sb_df <- samplesize_sim %>%
       select(algorithm, sample_size, rep) %>% 
       distinct() %>%
       mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
-  })
+  }) %>%
+  bind_rows()
+```
 
-sb_balance <- function(data, samples_df){
-  samples_df %>%
-    select(sample_size, inc_prob, contains("ECO_NUM")) %>%
-    distinct()
-}
+Let's do stratified equal probability
+```{r}
+# sb_balance <- function(data, samples_df){
+#   samples_df %>%
+#     select(sample_size, inc_prob, contains("ECO_NUM")) %>%
+#     distinct()
+# }
+
+strata_sim %>%
+  filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
+  group_by(simid) %>%
+  group_map(~{
+    
+    N <- dim(dist_mat)[1]
+    piks <- select(.x, id, inc_prob)
+    
+    # get filler rows for id's that were
+    ids <- 1:N #list of all possible id's
+    ids <- 
+    
+    .x %>%
+      select(algorithm, sample_size, rep) %>% 
+      distinct() %>%
+      mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
+  }) %>%
+  bind_rows()
 ```
