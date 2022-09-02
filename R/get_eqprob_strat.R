@@ -100,11 +100,11 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
   if(dim(missing_ecoregion)[1] > 0){
     warning(paste0("There are ", dim(missing_ecoregion)[1], " ecoregions that have not been allocated any samples for sample size ", n, "."))
 
-    ecoregion_pts <- ecoregion_pts %>%
+    inc_ecoreg_pts <- ecoregion_pts %>%
       filter(!ECO_NUM %in% missing_ecoregion$ECO_NUM)
 
     strata_df <- filter(strata_df, sample_size != 0)
-  }
+  } else inc_ecoreg_pts <- ecoregion_pts
 
   # calculate the bespoke things each algorithm needs
 
@@ -114,22 +114,24 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
     tibble::deframe()
 
   # vector of inclusion probabilities
-  pik <- ecoregion_pts$inc_prob
+  pik <- inc_ecoreg_pts$inc_prob
 
   # matrix of coordinates
-  pt_mat <- as.matrix(cbind(sf::st_coordinates(ecoregion_pts)[,1],
-                            sf::st_coordinates(ecoregion_pts)[,2]))
+  pt_mat <- as.matrix(cbind(sf::st_coordinates(inc_ecoreg_pts)[,1],
+                            sf::st_coordinates(inc_ecoreg_pts)[,2]))
 
   # make sure there's a complete ID column even if we had to drop data
-  ecoregion_pts <- ecoregion_pts %>%
+  inc_ecoreg_pts <- inc_ecoreg_pts %>%
     mutate(tempid = row_number())
 
-  purrr::map_dfr(1:nreps,
+  sim_reps <- purrr::map_dfr(1:nreps,
                  function(rep) {
                    print(c(rep, n))
                    #pt_df, pt_mat, pik, n, N, strata_n
-                   get_eqprob_strat(pt_df = ecoregion_pts, pt_mat = pt_mat, pik = pik,
+                   get_eqprob_strat(pt_df = inc_ecoreg_pts, pt_mat = pt_mat, pik = pik,
                                     n = n, strata_n = strata_n) %>%
                      mutate(rep = rep)
-                 })
+                 }) %>% mutate(sample_size = n)
+
+  return(list(sim_reps = sim_reps, ecoreg_inclusion_prob = mutate(ecoregion_pts, sample_size = n)))
 }

@@ -35,8 +35,7 @@ n <- 100
 repn <- 100
 
 #list of sample sizes
-#sample_sizes <- c(10, 20, 50, 100, 500, 1000, 5000)
-sample_sizes <- c(10, 20, 50, 100, 500, 1000)
+sample_sizes <- c(10, 20, 50, 100, 200, 300, 500)
 
 # to get more candidate points (increase N), larger pt_density 
 # qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
@@ -129,12 +128,16 @@ usethis::use_data(ecoregion_points_data)
 source(here::here("R/get_eqprob_strat.R"))
 
 plan("multisession", workers = length(sample_sizes))
-strata_sim <- furrr::future_map_dfr(sample_sizes, 
+strata_sim <- furrr::future_map(sample_sizes, 
                                         ~get_strata_reps(.x, strat_df = ecoregion_points_data, 
-                                                    nreps = repn, strata_col = ECO_NUM, area_col = PERC_AREA) %>% mutate(sample_size = .x), 
-                                        .options = furrr_options(seed = TRUE))  %>% 
-    unite("simid", rep, sample_size, algorithm, remove = FALSE)
+                                                    nreps = 5, strata_col = ECO_NUM, area_col = PERC_AREA), 
+                                        .options = furrr_options(seed = TRUE))
 
-usethis::use_data(strata_sim)
+ecoregion_inc_prob <- map_dfr(strata_sim, 2)
+strata_sim_points <- map_dfr(strata_sim, 1) %>%
+  unite("simid", rep, sample_size, algorithm, remove = FALSE)
+
+usethis::use_data(strata_sim_points)
+usethis::use_data(ecoregion_inc_prob)
 ```
 
