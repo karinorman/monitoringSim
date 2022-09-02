@@ -25,16 +25,9 @@ library(purrr)
 
 ```{r}
 load(here::here("data/qc_cand_points.rda"))
-load(here::here("data/ecoreg_pts.rda"))
+load(here::here("data/ecoregion_inc_prob.rda"))
 load(here::here("data/samplesize_sim.rda"))
-load(here::here("data/strata_sim.rda"))
-
-# one big happy dataframe
-# sim_designs <- bind_rows(samplesize_sim %>%
-#                            mutate(type = "equal_probability"),
-#                          strata_sim %>%
-#                            select(colnames(samplesize_sim), inc_prob) %>% 
-#   
+load(here::here("data/strata_sim_points.rda"))
 ```
 
 
@@ -42,6 +35,7 @@ Get spatial balance metric for each rep
 ```{r}
 # use the `Spbsampling` function
 dist_mat <- as.matrix(dist(qc_cand_points %>% 
+                             arrange(id) %>%
                              dplyr::mutate(lon = sf::st_coordinates(.)[,1], 
                                            lat = sf::st_coordinates(.)[,2]) %>%
                              as_tibble() %>%
@@ -53,7 +47,6 @@ sb_df <- samplesize_sim %>%
   group_by(simid) %>%
   group_map(~{
     n <- unique(.x$sample_size)
-    print(n)
     N <- dim(dist_mat)[1]
     pik <- rep(n/N,N)
     
@@ -69,23 +62,29 @@ sb_df <- samplesize_sim %>%
 
 Let's do stratified equal probability
 ```{r}
-# sb_balance <- function(data, samples_df){
-#   samples_df %>%
-#     select(sample_size, inc_prob, contains("ECO_NUM")) %>%
-#     distinct()
-# }
+# the inclusion probabilities df still excludes some points, let's fill in the holes
+ecoregion_inc_prob_fill <- ecoregion_inc_prob %>%
+  select(sample_size, id, inc_prob)
 
-strata_sim %>%
-  filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
+sb_strat_df <- strata_sim_points %>%
+  #filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
   group_by(simid) %>%
   group_map(~{
     
+    n <- unique(.x$sample_size)
     N <- dim(dist_mat)[1]
-    piks <- select(.x, id, inc_prob)
     
-    # get filler rows for id's that were
-    ids <- 1:N #list of all possible id's
-    ids <- 
+    samp_size_data <- ecoregion_inc_prob %>%
+      filter(sample_size == n)
+    
+    #get missing id's from inc_prob data
+    missing_id <- tibble(id = setdiff(1:N, samp_size_data$id), inc_prob = 0)
+    
+    pik <- bind_rows(samp_size_data, missing_id) %>%
+      arrange(id) %>%
+      pull(inc_prob)
+    
+    id_vec <- unique(.x$id)
     
     .x %>%
       select(algorithm, sample_size, rep) %>% 
