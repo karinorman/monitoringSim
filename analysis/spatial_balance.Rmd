@@ -42,7 +42,7 @@ dist_mat <- as.matrix(dist(qc_cand_points %>%
                              select(-x)))
 
 # This calculates inclusion probabilities and spatial balance metric for an equal probability study design
-sb_df <- samplesize_sim %>%
+sb_eqprob <- samplesize_sim %>%
   #filter(simid %in% c("1_10_srs","1_10_grts","1_10_cube","1_10_scps","1_10_lpm1","1_10_lpm2")) %>%
   group_by(simid) %>%
   group_map(~{
@@ -57,7 +57,18 @@ sb_df <- samplesize_sim %>%
       distinct() %>%
       mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
   }) %>%
-  bind_rows()
+  bind_rows() %>%
+  unite("simid", rep, sample_size, algorithm, remove = FALSE)
+
+usethis::use_data(sb_eqprob)
+
+sb_eqprob %>%
+  group_by(sample_size, algorithm) %>%
+  summarize(mean = mean(sb), sd = sd(sb)) %>%
+  ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
+  geom_line() +
+  labs(y ="Mean Sample Balance", x = "Sample Size") 
+# geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
 ```
 
 Let's do stratified equal probability
@@ -91,5 +102,6 @@ sb_strat_df <- strata_sim_points %>%
       distinct() %>%
       mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
   }) %>%
-  bind_rows()
+  bind_rows() %>%
+  unite("simid", rep, sample_size, algorithm, remove = FALSE)
 ```

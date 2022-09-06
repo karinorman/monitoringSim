@@ -30,7 +30,7 @@ qc_mammals_proj <- st_transform(qc_mammals, crs = 5070)
 
 load(here::here("data/qc_cand_points.rda"))
 load(here::here("data/samplesize_sim.rda"))
-load(here::here("data/strata_sim.rda"))
+load(here::here("data/strata_sim_points.rda"))
 
 # check if CRS match
 # raster::compareCRS(qc_mammals_proj, qc_cand_points)
@@ -59,7 +59,7 @@ specieslist_long <- mammal_specieslist %>%
   filter(value == TRUE) %>%
   dplyr::select(-value)
 
-richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_sim), ~ {
+richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_sim_points), ~ {
   design_lists <- .x %>%
     dplyr::select(-x) %>%
     left_join(specieslist_long, by = "id")
