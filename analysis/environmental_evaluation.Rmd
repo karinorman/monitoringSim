@@ -18,40 +18,20 @@ library(sf)
 
 Get selected points and landcover data
 ```{r}
-load(here::here("data/qc_cand_points.rda")) #candidate points
-load(here::here("data/samplesize_sim.rda")) # selected points 
-
-qc_lc <- raster::raster(here::here("data/can_lc_proj.tif")) # landcover data
-load(here::here("data/clim_stack.rda")) # climate stack 
-
-
-pts <- qc_cand_points %>%
-  filter(id %in% unique(samplesize_sim$id))
-
-#check everything is in the same projection
-raster::compareCRS(qc_lc, pts)
-raster::compareCRS(clim_stack, pts)
-```
-Get environmental data for each point
-```{r}
-lc_pts <- raster::extract(qc_lc, pts, df = TRUE)
-worldclim_pts <- raster::extract(clim_stack, pts, df = TRUE)
-
-envdata_pts <- left_join(worldclim_pts, lc_pts, by = "ID")
-
-usethis::use_data(envdata_pts)
+load(here::here("data/env_pts_data.rda")) #environmental data for each point
+load(here::here("data/samplesize_sim.rda"))
 ```
 
 Look at correlation
 ```{r}
-#pairs(dplyr::select(envdata_pts[,1:10], -ID))
+#pairs(dplyr::select(env_pts_data[,1:10], -ID))
 ```
 
 ```{r}
 
 #PCA of the variables to reduce the dimensionality
-envdata <- envdata_pts %>% 
-  dplyr::select(-can_lc_proj) %>%
+envdata <- env_pts_data %>% 
+  select(-starts_with(c("silvis", "ghmts")), -x) %>%
   drop_na()
 
 env_pca <- ade4::dudi.pca(df = dplyr::select(envdata, -ID), 
@@ -60,7 +40,7 @@ env_pca <- ade4::dudi.pca(df = dplyr::select(envdata, -ID),
 env_pc <- as.data.frame(env_pca$li) %>%
   cbind(ID = envdata$ID, .)
 
-# envdata_scale <- envdata_pts %>% 
+# envdata_scale <- env_pts_data %>% 
 #   select(-ID, -can_lc_proj) %>%
 #   mutate(across(everything(), ~scale(.x)))
 
@@ -98,19 +78,29 @@ Ok so things look as they should.
 Let's try with the actual simulated samples
 ```{r}
 # get a hypervolume for each of the simulation replicates
-sample_hyps <- samplesize_sim %>%
+
+# get a list of the point subsets for each simid (a list of df's)
+pca_dfs <- samplesize_sim %>%
   select(-x) %>%
   group_by(simid) %>%
-  group_map(., ~ env_pc %>%
+ # purrr::set_names() %>%
+  group_map(., ~ setNames(list(env_pc %>%
               filter(ID %in% .x$id) %>%
-              dplyr::select(-ID) %>%
-              hypervolume(), 
-            .keep = TRUE)
+              dplyr::select(-ID)), unique(.x$simid)), .keep = TRUE)
 
+
+
+# get the hypervolume for each
+hypervolume_safe <- possibly(hypervolume, NA)
+plan("multisession", workers = 120)
+
+sample_hyps <- furrr::future_map(pca_dfs[1:10], ~setNames(list(hypervolume_safe(.x[[1]])), names(.x)), 
+                                 .options = furrr_options(seed = TRUE))
+  
+  
 # get overlap stats between simulated hypervolumes and the complete environmental hypervolume
-overlap_stats <- map_dfr(sample_hyps, ~hypervolume_set(comp_hyp, .x, check.memory = FALSE) %>%
-                           hypervolume_overlap_statistics()) %>%
-  cbind(simid = unique(test_sim$simid), .)
+overlap_stats <- map_dfr(sample_hyps, ~hypervolume_set(comp_hyp, .x[[1]], check.memory = FALSE) %>%
+                           hypervolume_overlap_statistics() %>% c(., simid = names(.x))) 
 ```
 
 
