@@ -130,7 +130,7 @@ source(here::here("R/get_eqprob_strat.R"))
 plan("multisession", workers = length(sample_sizes))
 strata_sim <- furrr::future_map(sample_sizes, 
                                         ~get_strata_reps(.x, strat_df = ecoregion_points_data, 
-                                                    nreps = 5, strata_col = ECO_NUM, area_col = PERC_AREA), 
+                                                    nreps = repn, strata_col = ECO_NUM, area_col = PERC_AREA), 
                                         .options = furrr_options(seed = TRUE))
 
 ecoregion_inc_prob <- map_dfr(strata_sim, 2)
@@ -139,5 +139,21 @@ strata_sim_points <- map_dfr(strata_sim, 1) %>%
 
 usethis::use_data(strata_sim_points)
 usethis::use_data(ecoregion_inc_prob)
+```
+
+Function for plotting a single rep against the shapefile
+```{r}
+
+plot_design <- function(data, id){
+  
+  data %>%
+    filter(simid == id) %>%
+    st_as_sf()
+  
+  plot(qc_proj)
+  points(sf::st_coordinates(qc_cand_proj)[,1],
+         sf::st_coordinates(qc_cand_proj)[,2]))
+    
+}
 ```
 
