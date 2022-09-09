@@ -55,6 +55,7 @@ Questions:
   - first: for naive implementation - which algorithms happen to perform best (and under what scenarios), when you don't have environmental data to input
   - second: when environmental data has been inputted
 
+4. How well do algorithms perform when they have cost restrictions?
 
 # Methods
 
