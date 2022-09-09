@@ -74,20 +74,28 @@ richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_si
             sd = sd(richness))
 })
 
-eqprob_species_plot <- ggplot(richness_dfs$samplesize_sim %>% filter(sample_size <5000), 
-                              aes(x = sample_size, y = mean, color = algorithm)) +
-  geom_line() + 
-  labs(y ="Mean Richness", x = "Sample Size") +
-  theme_classic()
- # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
-
-strata_species_plot <- ggplot(richness_dfs$strata_sim, aes(x = sample_size, y = mean, color = algorithm)) +
-  geom_line() + 
-  labs(y ="Mean Richness", x = "Sample Size") +
-  theme_classic()
- # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
+# eqprob_species_plot <- ggplot(richness_dfs$samplesize_sim %>% filter(sample_size <5000), 
+#                               aes(x = sample_size, y = mean, color = algorithm)) +
+#   geom_line() + 
+#   labs(y ="Mean Richness", x = "Sample Size") +
+#   theme_classic()
+#  # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
+# 
+# strata_species_plot <- ggplot(richness_dfs$strata_sim, aes(x = sample_size, y = mean, color = algorithm)) +
+#   geom_line() + 
+#   labs(y ="Mean Richness", x = "Sample Size") +
+#   theme_classic()
+#  # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
 
 #ggsave("figures/ex_richness_sat.jpg", width = 5, height = 3.5, units = "in")
+```
+```{r}
+iucn_df <- bind_rows(richness_dfs$samplesize_sim %>% mutate(sim_type = "equal_prob"),
+          richness_dfs$strata_sim %>% mutate(sim_type = "stratified_equal_prob")) %>%
+  select(-sd) %>%
+  rename(iucn = mean)
+
+usethis::use_data(iucn_df)
 ```
 
 

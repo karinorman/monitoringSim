@@ -62,12 +62,12 @@ sb_eqprob <- samplesize_sim %>%
 
 usethis::use_data(sb_eqprob)
 
-sb_eqprob %>%
-  group_by(sample_size, algorithm) %>%
-  summarize(mean = mean(sb), sd = sd(sb)) %>%
-  ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
-  geom_line() +
-  labs(y ="Mean Sample Balance", x = "Sample Size") 
+# sb_eqprob %>%
+#   group_by(sample_size, algorithm) %>%
+#   summarize(mean = mean(sb), sd = sd(sb)) %>%
+#   ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
+#   geom_line() +
+#   labs(y ="Mean Sample Balance", x = "Sample Size") 
 # geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
 ```
 
@@ -107,11 +107,23 @@ sb_strat_df <- strata_sim_points %>%
 
 usethis::use_data(sb_strat_df)
 
-sb_strat_df %>%
-  group_by(sample_size, algorithm) %>%
-  summarize(mean = mean(sb), sd = sd(sb)) %>%
-  ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
-  geom_line() +
-  labs(y ="Mean Sample Balance", x = "Sample Size") +
-  geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
+# sb_strat_df %>%
+#   group_by(sample_size, algorithm) %>%
+#   summarize(mean = mean(sb), sd = sd(sb)) %>%
+#   ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
+#   geom_line() +
+#   labs(y ="Mean Sample Balance", x = "Sample Size") +
+#   geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd))
 ```
+
+Final dataframe
+```{r}
+sb_df <- sb_eqprob %>%
+  mutate(sim_type = "equal_prob") %>%
+  bind_rows(sb_strat_df %>% mutate(sim_type = "stratified_equal_prob")) %>%
+  group_by(sample_size, algorithm, sim_type) %>%
+  summarize(sp = mean(sb), .groups = "keep") 
+
+usethis::use_data(sb_df)
+```
+
