@@ -25,7 +25,7 @@ metrics <- full_join(iucn_df, sb_df) %>%
 ```
 Function to plot a panel
 ```{r}
-plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_algos = NULL){
+plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_algos = NULL, color_list){
   data %>%
     select(sample_size, algorithm, sim_type, !!metric_var) %>%
     filter(sim_type == type, !algorithm %in% exclude_algos) %>%
@@ -33,11 +33,15 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
     geom_line() +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
-    theme(axis.title = element_text(size=7), legend.position = "none") #+
-    #scale_colour_manual(values = my_pal, drop = FALSE)
+    theme(axis.title = element_text(size=7), legend.position = "none") +
+    scale_colour_manual(values = color_list, drop = FALSE)
 }
 
-#my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
+my_pal <- NatParksPalettes::natparks.pals(name="DeathValley",n=6,type="discrete")
+
+# Set palette colors and assign to algorithms
+my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
+group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
 
 plot_df <- tibble(metric_var = c("iucn", "iucn", "sb", "sb", "jsd", "jsd"),
                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
@@ -46,7 +50,7 @@ plot_df <- tibble(metric_var = c("iucn", "iucn", "sb", "sb", "jsd", "jsd"),
                   exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
                   )
 
-plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics)
+plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics, color_list = group_colors)
 
 plot_join <- plot_grid(plotlist=plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -59,7 +63,8 @@ legend_plot <- metrics %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7))
+    theme(axis.title = element_text(size=7)) +
+  scale_colour_manual(values = group_colors, drop = FALSE)
 
 legend <- get_legend(legend_plot)
 
