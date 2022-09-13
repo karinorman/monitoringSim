@@ -24,7 +24,8 @@ metrics <- full_join(iucn_df, sb_df) %>%
   full_join(jsd_df) %>%
   # we want all of the metrics between 0 and 1 and decaying 
   mutate(iucn_scale = 1 - (iucn/65), # fraction of species missing
-         sb_scale = scale(sb,center=min(sb),scale=diff(range(sb))))
+         sb_scale = as.vector(scale(sb,center=min(sb),scale=diff(range(sb)))),
+         jsd_scale = as.vector(scale(jsd,center=min(jsd),scale=diff(range(jsd)))))
 
 ```
 Function to plot a panel
@@ -33,7 +34,7 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
   data %>%
     select(sample_size, algorithm, sim_type, !!metric_var) %>%
     filter(sim_type == type, !algorithm %in% exclude_algos) %>%
-    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm)) +
+    ggplot(aes(x = log(sample_size), y = !!sym(metric_var), color = algorithm)) +
     geom_line() +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
@@ -41,13 +42,13 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
     scale_colour_manual(values = color_list, drop = FALSE)
 }
 
-my_pal <- NatParksPalettes::natparks.pals(name="DeathValley",n=6,type="discrete")
+#my_pal <- NatParksPalettes::natparks.pals(name="DeathValley",n=6,type="discrete")
 
 # Set palette colors and assign to algorithms
 my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
 group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
 
-plot_df <- tibble(metric_var = c("iucn", "iucn", "sb", "sb", "jsd", "jsd"),
+plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
                   ylabel = c("Mean IUCN coverage", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
