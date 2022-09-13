@@ -55,7 +55,8 @@ sb_eqprob <- samplesize_sim %>%
     .x %>%
       select(algorithm, sample_size, rep) %>% 
       distinct() %>%
-      mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
+      mutate(sb = list(spbalance(dist_mat, pik, id_vec)))
+    
   }) %>%
   bind_rows() %>%
   unite("simid", rep, sample_size, algorithm, remove = FALSE)
@@ -100,7 +101,7 @@ sb_strat_df <- strata_sim_points %>%
     .x %>%
       select(algorithm, sample_size, rep) %>% 
       distinct() %>%
-      mutate(sb = Spbsampling::sbi(dist_mat, pik, id_vec))
+      mutate(sb = list(spbalance(dist_mat, pik, id_vec)))
   }) %>%
   bind_rows() %>%
   unite("simid", rep, sample_size, algorithm, remove = FALSE)
@@ -121,8 +122,9 @@ Final dataframe
 sb_df <- sb_eqprob %>%
   mutate(sim_type = "equal_prob") %>%
   bind_rows(sb_strat_df %>% mutate(sim_type = "stratified_equal_prob")) %>%
+  unnest(sb) %>% 
   group_by(sample_size, algorithm, sim_type) %>%
-  summarize(sb = mean(sb), .groups = "keep") 
+  summarize(sb = var(sb), .groups = "keep") 
 
 usethis::use_data(sb_df)
 ```
