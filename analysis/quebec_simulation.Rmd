@@ -39,7 +39,7 @@ repn <- 100
 
 # get sample sizes on a log scale, this is a range from about 10 to 550
 log_samp <- seq(2.3, 6.3, by = 0.4)
-sample_sizes <- exp(log_samp)
+sample_sizes <- round(exp(log_samp))
 
 # to get more candidate points (increase N), larger pt_density 
 # qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
@@ -137,8 +137,8 @@ strata_sim <- furrr::future_map(sample_sizes,
                                                     nreps = repn, strata_col = ECO_NUM, area_col = PERC_AREA), 
                                         .options = furrr_options(seed = TRUE))
 
-ecoregion_inc_prob <- map_dfr(strata_sim, 2)
-strata_sim_points <- map_dfr(strata_sim, 1) %>%
+ecoregion_inc_prob <- purrr::map_dfr(strata_sim, 2)
+strata_sim_points <- purrr::map_dfr(strata_sim, 1) %>%
   unite("simid", rep, sample_size, algorithm, remove = FALSE)
 
 usethis::use_data(strata_sim_points)
