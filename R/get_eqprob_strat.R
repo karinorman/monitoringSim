@@ -126,7 +126,6 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
 
   sim_reps <- purrr::map_dfr(1:nreps,
                  function(rep) {
-                   print(c(rep, n))
                    #pt_df, pt_mat, pik, n, N, strata_n
                    get_eqprob_strat(pt_df = inc_ecoreg_pts, pt_mat = pt_mat, pik = pik,
                                     n = n, strata_n = strata_n) %>%
