@@ -21,6 +21,10 @@ Get selected points and landcover data
 load(here::here("data/env_pts_data.rda")) #environmental data for each point
 load(here::here("data/samplesize_sim.rda"))
 load(here::here("data/strata_sim_points.rda"))
+
+envdata <- env_pts_data %>% 
+  select(-starts_with(c("silvis", "ghmts")), -x) %>%
+  drop_na()
 ```
 
 Look at correlation
@@ -31,10 +35,6 @@ Look at correlation
 ```{r}
 
 #PCA of the variables to reduce the dimensionality
-envdata <- env_pts_data %>% 
-  select(-starts_with(c("silvis", "ghmts")), -x) %>%
-  drop_na()
-
 env_pca <- ade4::dudi.pca(df = dplyr::select(envdata, -ID), 
   center = TRUE, scale = TRUE, scannf = FALSE, nf = 3)
 
@@ -123,7 +123,7 @@ Function to map across variables
 get_var_jsd <- function(env_data, var_name, sample_data){
   binned_data <- env_data %>% 
   select(ID, !!var_name) %>%
-  mutate(bins = cut_interval(!!sym(var_name), n = 10, labels = FALSE)) 
+  mutate(bins = ggplot2::cut_interval(!!sym(var_name), n = 10, labels = FALSE)) 
 
 total_dist <- binned_data %>% 
   count(bins) %>% 
@@ -164,11 +164,15 @@ env_vars <- envdata %>% select(-ID) %>% colnames()
 #plan("multisession", workers = length(env_vars))
 # env_vars_jsd <- map(env_vars[c(1, 4, 20, 21, 22)], ~get_var_jsd(env_data = envdata, var_name = .x, sample_data = comb_sim_df)) #%>% 
   # reduce(full_join, by = "simid") 
+rm(ecoreg_pts, ecoregion_inc_prob, ecoregion_points_data, env_pts_data, 
+   qc_cand_points, samplesize_sim, strata_sim, strata_sim_points)
 
-env_vars_jsd <- map(env_vars, ~get_var_jsd(env_data = envdata, var_name = .x, sample_data = comb_sim_df)) #%>% 
+env_vars_jsd <- purrr::map(env_vars, ~get_var_jsd(env_data = envdata, var_name = .x, sample_data = comb_sim_df)) %>% 
+  purrr::reduce(full_join, by = c("simid", "sim_type"))
 
 usethis::use_data(env_vars_jsd)
 ```
+
 Final df structure
 ```{r}
 jsd_df <- env_vars_jsd %>%
@@ -183,33 +187,3 @@ jsd_df <- env_vars_jsd %>%
 
 usethis::use_data(jsd_df)
 ```
-
-Plot for all variables
-```{r}
-# jsd_long <- env_vars_jsd %>%
-#   separate(simid, "_", into = c("rep", "sample_size", "algorithm")) %>%
-#   mutate(across(-c(algorithm), ~as.numeric(.))) %>%
-#   group_by(sample_size, algorithm) %>%
-#   summarize(across(-rep, ~mean(.x)), .groups = "keep") %>%
-#   ungroup() %>%
-#   pivot_longer(c(everything(), -sample_size, -algorithm), names_to = "env_variable")
-# 
-# # plot the variables individually
-#  jsd_long %>%
-#   ggplot(aes(x = sample_size, y = value, color = algorithm)) +
-#   geom_line() +
-#   facet_wrap(vars(env_variable)) +
-#   labs(y ="Mean env coverage", x = "Sample Size")
-# 
-# # plot the average across variables
-# jsd_long %>%
-#   group_by(sample_size, algorithm) %>%
-#   summarize(mean_jsd = mean(value), .groups = "keep") %>%
-#   ggplot(aes(x = sample_size, y = mean_jsd, color = algorithm)) +
-#   geom_line() +
-#   labs(y ="Mean env coverage", x = "Sample Size")
-```
-
-
-
-
