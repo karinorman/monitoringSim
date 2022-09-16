@@ -9,7 +9,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-library(hypervolume)
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -26,95 +25,6 @@ envdata <- env_pts_data %>%
   select(-starts_with(c("silvis", "ghmts")), -x) %>%
   drop_na()
 ```
-
-Look at correlation
-```{r}
-#pairs(dplyr::select(env_pts_data[,1:10], -ID))
-```
-
-```{r}
-
-#PCA of the variables to reduce the dimensionality
-env_pca <- ade4::dudi.pca(df = dplyr::select(envdata, -ID), 
-  center = TRUE, scale = TRUE, scannf = FALSE, nf = 3)
-
-env_pc <- as.data.frame(env_pca$li) %>%
-  cbind(ID = envdata$ID, .)
-
-# envdata_scale <- env_pts_data %>% 
-#   select(-ID, -can_lc_proj) %>%
-#   mutate(across(everything(), ~scale(.x)))
-
-comp_hyp <- hypervolume(env_pca$li)
-
-# example comparison but taking a random subset of points
-
-envdata_samp <- sample_n(env_pca$li, 500)
-samp_hyp <- hypervolume(envdata_samp)
-
-overlap <- hypervolume_set(comp_hyp, samp_hyp, check.memory = FALSE)
-hypervolume_overlap_statistics(overlap)
-```
-
-Need to figure out if the hypervolumes and metrics are behaving the way they should
-```{r}
-# Let's make increasingly larger subsets of the original hypervolume
-
-samp_props <- c(0.02, 0.05, 0.10, 0.25, 0.50, 0.75)
-
-get_prop_overlap <- function(samp_prop, comp_hyp, env_data){
-  subset_data <- slice_sample(env_data, prop = samp_prop)
-  subset_hyp <- hypervolume(subset_data)
-  
-  overlap <- hypervolume_set(comp_hyp, subset_hyp, check.memory = FALSE)
-  hypervolume_overlap_statistics(overlap)
-}
-
-sim_df <- map_df(samp_props, get_prop_overlap, comp_hyp = comp_hyp, env_data = env_pca$li) %>%
-  cbind(samp_props, .)
-
-```
-Ok so things look as they should.
-
-Let's try with the actual simulated samples
-```{r}
-# get a hypervolume for each of the simulation replicates
-
-# get a list of the point subsets for each simid (a list of df's)
-pca_dfs <- samplesize_sim %>%
-  select(-x) %>%
-  group_by(simid) %>%
- # purrr::set_names() %>%
-  group_map(., ~ setNames(list(env_pc %>%
-              filter(ID %in% .x$id) %>%
-              dplyr::select(-ID)), unique(.x$simid)), .keep = TRUE)
-
-
-
-# get the hypervolume for each
-hypervolume_safe <- possibly(hypervolume, NA)
-
-plan("multisession", workers = 120)
-
-sample_hyps <- furrr::future_map(pca_dfs, ~setNames(list(hypervolume_safe(.x[[1]])), names(.x)), 
-                                 .options = furrr_options(seed = TRUE))
-  
-  
-# get overlap stats between simulated hypervolumes and the complete environmental hypervolume
-overlap_stats <- map_dfr(sample_hyps, ~hypervolume_set(comp_hyp, .x[[1]], check.memory = FALSE) %>%
-                           hypervolume_overlap_statistics() %>% c(., simid = names(.x))) 
-
-overlap_stats %>%
-  separate(simid, "_", into = c("rep", "sample_size", "algorithm")) %>%
-  mutate(across(-c(algorithm), ~as.numeric(.))) %>%
-  group_by(sample_size, algorithm) %>%
-  summarize(mean = mean(jaccard), sd = sd(jaccard), .groups = "keep") %>%
-  ungroup(sample_size) %>%
-  ggplot(aes(x = sample_size, y = mean, color = algorithm)) +
-  geom_line() +
-  labs(y ="Mean env coverage", x = "Sample Size") 
-```
-
 
 ### Jensen-shannon divergence of the env axes
 
