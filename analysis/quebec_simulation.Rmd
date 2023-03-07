@@ -46,6 +46,21 @@ sample_sizes <- round(exp(log_samp))
 
 usethis::use_data(qc_cand_points)
 ```
+Get ecoregions for stratification
+```{r}
+#get ecoregion data
+ecoreg <- st_read(here::here("data/wwf_ecoregions/wwf_terr_ecos.shp")) %>%
+  st_transform(ecoreg, crs = 5070) %>%
+  st_make_valid()
+
+# make sure CRS matches candidate points
+raster::compareCRS(ecoreg, qc_cand_points)
+
+# get the ecoregion for each point
+ecoreg_pts <- st_intersection(qc_cand_points, ecoreg)
+
+usethis::use_data(ecoreg_pts)
+```
 
 ## Equal probability sampling
 ```{r}
@@ -71,22 +86,6 @@ usethis::use_data(samplesize_sim)
 ```
 
 ## Stratified Equal Probability sampling
-```{r}
-library(sf)
-
-#get ecoregion data
-ecoreg <- st_read(here::here("data/wwf_ecoregions/wwf_terr_ecos.shp")) %>%
-  st_transform(ecoreg, crs = 5070) %>%
-  st_make_valid()
-
-# make sure CRS matches candidate points
-raster::compareCRS(ecoreg, qc_cand_points)
-
-# get the ecoregion for each point
-ecoreg_pts <- st_intersection(qc_cand_points, ecoreg)
-
-usethis::use_data(ecoreg_pts)
-```
 
 How many points are in each ecoregion? Exclude ecoregions with very few points
 ```{r}
@@ -144,6 +143,13 @@ strata_sim_points <- purrr::map_dfr(strata_sim, 1) %>%
 usethis::use_data(strata_sim_points)
 usethis::use_data(ecoregion_inc_prob)
 ```
+## Simulate latitude bands
+
+```{r}
+# number of latitude bands
+
+```
+
 
 Function for plotting a single rep against the shapefile
 ```{r}
@@ -156,7 +162,7 @@ plot_design <- function(data, id){
   
   plot(qc_proj)
   points(sf::st_coordinates(qc_cand_proj)[,1],
-         sf::st_coordinates(qc_cand_proj)[,2]))
+         sf::st_coordinates(qc_cand_proj)[,2])
     
 }
 ```
