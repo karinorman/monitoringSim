@@ -42,7 +42,8 @@ info_chelsa_climate<- get_info_collection(stac_path =
                                           bbox = NULL)
 
 
-srs_cube <- "EPSG:6623"
+#srs_cube <- "EPSG:6623"
+srs_cube <- "EPSG:5070"
 bounds <- c(xmin = -80.0, xmax = -50.0,
             ymax =  65.0, ymin = 40.0 )
 
@@ -110,10 +111,35 @@ env_stack <- raster::stack(layer_files)
 
 #get points
 load(here::here("data/qc_cand_points.rda"))
-qc_cand_proj <- qc_cand_points %>%
-  st_transform(crs = 6623)
+qc_cand_proj <- qc_cand_points #%>%
+  #st_transform(crs = 6623)
 
 env_pts_data <- raster::extract(env_stack, arrange(qc_cand_proj, id), df = TRUE) %>%
   left_join(qc_cand_points, by = c("ID" = "id"))
 
 usethis::use_data(env_pts_data)
+
+# # Plot to see what's going on and why we're missing data
+# library(viridis)
+# library(ggthemes)
+#
+# ndvi_spdf <- as(env_stack$NDVI16_cumulative, "SpatialPixelsDataFrame")
+# ndvi_df <- as.data.frame(ndvi_spdf)
+# colnames(ndvi_df) <- c("value", "x", "y")
+# ndvi_missing <- ndvi_df %>% filter(is.na(value))
+#
+# plotting_points <- qc_cand_points %>%
+#   mutate(x = sf::st_coordinates(qc_cand_points)[,1],
+#          y = sf::st_coordinates(qc_cand_points)[,2]) %>%
+#   setdiff(ndvi_missing)
+#
+# ggplot(ndvi_df, aes(x=x, y=y)) +
+#   geom_tile(aes(fill=value), alpha=0.8) +
+#   # geom_polygon(data=qc_proj[1], aes(x=long, y=lat, group=group),
+#   #              fill=NA, color="grey50", size=0.25) +
+#   geom_point(data = plotting_points %>% filter(is.na), fill = "black", size = 0.05) +
+#   scale_fill_viridis() +
+#   coord_equal() +
+#   theme_map() +
+#   theme(legend.position="bottom") +
+#   theme(legend.key.width=unit(2, "cm"))

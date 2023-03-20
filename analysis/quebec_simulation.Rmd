@@ -46,6 +46,13 @@ sample_sizes <- round(exp(log_samp))
 
 usethis::use_data(qc_cand_points)
 ```
+
+Plot points on shapefile
+```{r}
+ggplot() + geom_sf(data = qc_proj[1], fill = "grey") + 
+  geom_sf(data = qc_cand_points, fill = "black", size = 0.05)
+```
+
 Get ecoregions for stratification
 ```{r}
 #get ecoregion data

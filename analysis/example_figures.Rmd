@@ -1,0 +1,76 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-03-20"
+---
+```{r}
+library(dplyr)
+library(sf)
+library(viridis)
+library(ggthemes)
+```
+
+Clip NDVI to quebec, make sure they have the same projection
+```{r}
+load(here::here("data/qc.rda"))
+qc_proj <- st_transform(qc, crs = 5070)
+
+load(here::here("data/qc_cand_points.rda"))
+
+ndvi <- raster::raster(here::here("data/env_layers/silvisNDVI16_cumulative_2003-01-01.tif"))
+
+#raster::compareCRS(qc_proj, qc_cand_points)
+#raster::compareCRS(qc_proj, ndvi)
+```
+
+Clip to Quebec
+```{r}
+ndvi_qc <- raster::mask(ndvi, qc_proj)
+ndvi_qc_df <- as.data.frame(as(ndvi_qc, "SpatialPixelsDataFrame"))
+
+ggplot(ndvi_qc_df, aes(x=x, y=y)) +
+  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  scale_fill_viridis() +
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="bottom") +
+  theme(legend.key.width=unit(2, "cm"))
+
+ggsave(here::here("figures/presentation_examples/quebec_NDVI.jpeg"))
+```
+
+```{r}
+ex_qc_cand_points <- get_cand_points(qc_proj, 100, pt_density = 10)
+
+plotting_points <- ex_qc_cand_points %>%
+  mutate(x = sf::st_coordinates(ex_qc_cand_points)[,1],
+         y = sf::st_coordinates(ex_qc_cand_points)[,2])
+
+ggplot(ndvi_qc_df, aes(x=x, y=y)) +
+  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  geom_point(data = plotting_points, fill = "black", size = 0.6) +
+  scale_fill_viridis() +
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="bottom") +
+  theme(legend.key.width=unit(2, "cm"))
+
+ggsave(here::here("figures/presentation_examples/quebec_potential_points.jpeg"))
+```
+```{r}
+selected_ex_points <- slice_sample(ex_qc_cand_points, n = 20) %>%
+  mutate(x = sf::st_coordinates(.)[,1],
+         y = sf::st_coordinates(.)[,2])
+
+ggplot(ndvi_qc_df, aes(x=x, y=y)) +
+  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  geom_point(data = selected_ex_points, fill = "black", size = 2) +
+  scale_fill_viridis() +
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="bottom") +
+  theme(legend.key.width=unit(2, "cm"))
+
+ggsave(here::here("figures/presentation_examples/quebec_saved_points.jpeg"))
+```
+
