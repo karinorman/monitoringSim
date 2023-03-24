@@ -20,26 +20,34 @@ load(here::here("data/sb_df.rda")) #spatial balance metrics
 load(here::here("data/iucn_df.rda")) #iucn range map coverage (mean richness)
 load(here::here("data/jsd_df.rda")) #jensen-shannon divergence averaged across environmental variables
 
+#load(here::here("data/qc_mammals.rda"))
+#n_distinct(qc_mammals$binomial)
+# results in 61 total mammals in Quebec
+
 metrics <- full_join(iucn_df, sb_df) %>%
   full_join(jsd_df) %>%
   # we want all of the metrics between 0 and 1 and decaying 
-  mutate(iucn_scale = 1 - (iucn/65), # fraction of species missing
+  mutate(iucn_scale = 1 - (iucn/61), # fraction of species missing
          sb_scale = as.vector(scale(sb,center=min(sb),scale=diff(range(sb)))),
          jsd_scale = as.vector(scale(jsd,center=min(jsd),scale=diff(range(jsd)))))
 
 ```
 Function to plot a panel
 ```{r}
-plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_algos = NULL, color_list){
-  data %>%
+plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_algos = NULL, color_list, plot_path = NULL, ...){
+  plot <- data %>%
     select(sample_size, algorithm, sim_type, !!metric_var) %>%
     filter(sim_type == type, !algorithm %in% exclude_algos) %>%
-    ggplot(aes(x = log(sample_size), y = !!sym(metric_var), color = algorithm)) +
+    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm)) +
     geom_line() +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
-    theme(axis.title = element_text(size=7), legend.position = "none") +
+    theme(legend.position = "none", ...) +
     scale_colour_manual(values = color_list, drop = FALSE)
+  
+  if(hasArg(plot_path)) ggsave(plot_path, plot = plot)
+  
+  return(plot)
 }
 
 #my_pal <- NatParksPalettes::natparks.pals(name="DeathValley",n=6,type="discrete")
@@ -48,14 +56,16 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
 my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
 group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
 
-plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+  metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
-                  ylabel = c("Mean IUCN coverage", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
+                  ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
-                  exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
+                  #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
+                  exclude_algos = list("", "", "", "", "", "")
                   )
 
-plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics, color_list = group_colors)
+plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics, color_list = group_colors, axis.title = element_text(size=7))
 
 plot_join <- plot_grid(plotlist=plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -98,5 +108,19 @@ plot_grid(plot_join, legend, rel_widths = c(3,.4)) %>%
   rel_heights = c(0.1, 1))
 
 ggsave2(here::here("figures/sim_evaluation_color.jpeg"), bg = "white")
+```
+Save plots individually with all axis labels 
+```{r}
+paths <- c("iucn_eq.jpeg", "iucn_strat.jpeg", "sb_eq.jpeg", "sb_strat.jpeg", "jsd_eq.jpeg", "jsd_strat.jpeg")
+indv_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+                  type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+                  ylabel = c("Percent IUCN Species Missing", "Percent IUCN Species Missing", 
+                             "Mean Spatial Balance", "Mean Spatial Balance", "Mean Divergence", "Mean Divergence"),
+                  xlabel = rep("Sample Size", 6),
+                  plot_path = here::here("figures", paths)
+                  )
+
+purrr::pmap(indv_plot_df, plot_metric_curves, data = metrics, 
+            color_list = group_colors, axis.title = element_text(size=15), axis.text=element_text(size=10))
 ```
 
