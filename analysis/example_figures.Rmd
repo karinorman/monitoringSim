@@ -133,3 +133,49 @@ ggplot() +
 ggsave(here::here("figures/presentation_examples/quebec_ecoregion_points.jpeg"))
 ```
 
+# Sample monitoring networks
+```{r}
+load(here::here("data/samplesize_sim.rda"))
+load(here::here("data/strata_sim_points.rda"))
+
+# First equal probability, for which scps was the general winner, let's do small medium large
+scps_eqp <- samplesize_sim %>% filter(algorithm == "scps", rep == 1, sample_size %in% c(15, 110, 365)) %>%
+  st_as_sf() %>%
+    mutate(x = sf::st_coordinates(.)[,1],
+         y = sf::st_coordinates(.)[,2])
+
+ggplot(ndvi_qc_df, aes(x=x, y=y)) +
+  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  #geom_tile(aes(fill=NDVI16_cumulative)) +
+  geom_point(data = scps_eqp, fill = "black", size = 1) +
+  facet_wrap(~sample_size) +
+  scale_fill_viridis() +
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="bottom") +
+  theme(legend.key.width=unit(2, "cm"), plot.background = element_rect(fill='transparent', color=NA))
+
+ggsave(here::here("figures/presentation_examples/scps_eqprob_ex.jpeg"))
+```
+
+Now for stratified grts
+```{r}
+grts_strat <- strata_sim_points %>% 
+  filter(algorithm == "grts", rep == 1, sample_size %in% c(15, 110, 365)) %>%
+  st_as_sf() %>%
+    mutate(x = sf::st_coordinates(.)[,1],
+         y = sf::st_coordinates(.)[,2])
+
+# still haven't figured out how to do raster + shapefile + points
+# ggplot(ndvi_qc_df, aes(x=x, y=y)) +
+#   geom_sf(data = ecoreg_qc, fill = "white", colour = "black") +
+#   #geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+#   geom_tile(aes(fill=NDVI16_cumulative)) +
+#   geom_point(data = scps_eqp, fill = "black", size = 2) +
+#   facet_wrap(~sample_size) +
+#   scale_fill_viridis() #+
+#   # theme_map() +
+#   # theme(legend.position="bottom") +
+#   # theme(legend.key.width=unit(2, "cm"), plot.background = element_rect(fill='transparent', color=NA))
+```
+
