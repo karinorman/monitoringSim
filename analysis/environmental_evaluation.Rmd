@@ -92,7 +92,7 @@ jsd_df <- env_vars_jsd %>%
   summarize(across(-rep, ~mean(sqrt(.x))), .groups = "keep") %>% #take the square root so we actually have JSDistance (not divergence)
   ungroup() %>%
   pivot_longer(c(everything(), -sample_size, -algorithm, -sim_type), names_to = "env_variable") %>%
-  group_by(sample_size, algorithm) %>%
+  group_by(sample_size, algorithm, sim_type) %>%
   summarize(jsd = mean(value), .groups = "keep") 
 
 usethis::use_data(jsd_df)
