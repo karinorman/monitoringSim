@@ -54,10 +54,12 @@ mammal_specieslist <- st_intersects(qc_cand_points, qc_mammals_proj, prepared = 
 
 Look up mammal species lists for each monitoring network
 ```{r}
+## need to get rid of duplicate species in this data frame (have ...4 or something similar appended)
 specieslist_long <- mammal_specieslist %>%
   pivot_longer(cols = c(-x, -id), names_to = "species") %>%
   filter(value == TRUE) %>%
-  dplyr::select(-value)
+  dplyr::select(-value) %>%
+  mutate(species = stringr::str_remove(species, pattern = "\\..*"))
 
 richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_sim_points), ~ {
   design_lists <- .x %>%
