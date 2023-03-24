@@ -49,8 +49,8 @@ usethis::use_data(qc_cand_points)
 
 Plot points on shapefile
 ```{r}
-ggplot() + geom_sf(data = qc_proj[1], fill = "grey") + 
-  geom_sf(data = qc_cand_points, fill = "black", size = 0.05)
+# ggplot() + geom_sf(data = qc_proj[1], fill = "grey") + 
+#   geom_sf(data = qc_cand_points, fill = "black", size = 0.05)
 ```
 
 Get ecoregions for stratification
@@ -85,8 +85,9 @@ plan("multisession", workers = length(sample_sizes))
 samplesize_sim <- furrr::future_map_dfr(sample_sizes, 
                                         ~get_eqprop_reps(.x, N = N, pt_df = qc_cand_points, nreps = repn) %>% 
                                           mutate(sample_size = .x),
-                                        .options = furrr_options(packages = "monitoringSim",  
-                                        seed = TRUE))  %>% 
+                                        .options = furrr_options(seed = TRUE
+                                        #packages = "monitoringSim"  
+                                        ))  %>% 
     unite("simid", rep, sample_size, algorithm, remove = FALSE)
 
 usethis::use_data(samplesize_sim)

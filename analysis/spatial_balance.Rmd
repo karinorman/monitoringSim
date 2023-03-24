@@ -20,6 +20,7 @@ library(sampling)
 library(purrr)
 #library(raster)
 
+## need to load the R/spbalance.R function for this to run
 #devtools::load_all()
 ```
 
