@@ -26,20 +26,25 @@ ndvi <- raster::raster(here::here("data/env_layers/silvisNDVI16_cumulative_2003-
 Clip to Quebec
 ```{r}
 ndvi_qc <- raster::mask(ndvi, qc_proj)
+
 ndvi_qc_df <- as.data.frame(as(ndvi_qc, "SpatialPixelsDataFrame"))
 
 ggplot(ndvi_qc_df, aes(x=x, y=y)) +
-  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  #geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  geom_tile(aes(fill=NDVI16_cumulative)) +
   scale_fill_viridis() +
   coord_equal() +
   theme_map() +
   theme(legend.position="bottom") +
   theme(legend.key.width=unit(2, "cm"))
 
+ggsave(here::here("figures/presentation_examples/quebec_NDVI_dark.jpeg"))
+
 ggsave(here::here("figures/presentation_examples/quebec_NDVI.jpeg"))
 ```
 
 ```{r}
+#source(here::here("R/get_cand_points.R"))
 ex_qc_cand_points <- get_cand_points(qc_proj, 100, pt_density = 10)
 
 plotting_points <- ex_qc_cand_points %>%
@@ -58,19 +63,73 @@ ggplot(ndvi_qc_df, aes(x=x, y=y)) +
 ggsave(here::here("figures/presentation_examples/quebec_potential_points.jpeg"))
 ```
 ```{r}
+set.seed(12345)
 selected_ex_points <- slice_sample(ex_qc_cand_points, n = 20) %>%
   mutate(x = sf::st_coordinates(.)[,1],
          y = sf::st_coordinates(.)[,2])
 
 ggplot(ndvi_qc_df, aes(x=x, y=y)) +
-  geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  #geom_tile(aes(fill=NDVI16_cumulative), alpha=0.8) +
+  geom_tile(aes(fill=NDVI16_cumulative)) +
   geom_point(data = selected_ex_points, fill = "black", size = 2) +
   scale_fill_viridis() +
   coord_equal() +
   theme_map() +
   theme(legend.position="bottom") +
-  theme(legend.key.width=unit(2, "cm"))
+  theme(legend.key.width=unit(2, "cm"), plot.background = element_rect(fill='transparent', color=NA))
 
 ggsave(here::here("figures/presentation_examples/quebec_saved_points.jpeg"))
+```
+Quebec w/ecoregions
+```{r}
+#get ecoregion data
+ecoreg <- st_read(here::here("data/wwf_ecoregions/wwf_terr_ecos.shp")) %>%
+  st_transform(ecoreg, crs = 5070) %>%
+  st_make_valid()
+
+ecoreg_qc <- st_intersection(ecoreg, qc_proj) %>%
+  mutate(plotting_num = as.integer(as.factor(ECO_NAME))) %>%
+  unite(legend_name, plotting_num, ECO_NAME, sep = " ", remove = FALSE) %>%
+  group_by(plotting_num) %>%
+  mutate(label = case_when(
+    PERIMETER == max(PERIMETER) ~ plotting_num,
+    .default = NA
+  ))
+
+ggplot(ecoreg_qc) + 
+  geom_sf(aes(fill = legend_name)) +
+  geom_sf_label(aes(label = label)) +
+  #scale_fill_manual(values = RColorBrewer::brewer.pal(name = "Paired", n = 12)) +
+  theme_map() +
+  theme(legend.position="bottom", legend.justification = "left", legend.title = element_blank(), 
+        legend.text=element_text(size=7)) +
+  guides(fill=guide_legend(nrow=4))
+
+ggsave(here::here("figures/presentation_examples/quebec_ecoregions.jpeg"))
+```
+
+Plot candidate points colored by ecoregion
+```{r}
+# make sure CRS matches candidate points
+raster::compareCRS(ecoreg, ex_qc_cand_points)
+
+# get the ecoregion for each point
+ecoreg_ex_pts <- st_intersection(ex_qc_cand_points, ecoreg)
+
+ecoreg_plotting_points <- ecoreg_ex_pts %>%
+  mutate(x = sf::st_coordinates(ecoreg_ex_pts)[,1],
+         y = sf::st_coordinates(ecoreg_ex_pts)[,2])
+
+ggplot() + 
+  geom_sf(data = ecoreg_qc, fill = "white", colour = "black") +
+  geom_sf(data = ecoreg_ex_pts, aes(colour = ECO_NAME), size = 0.6) +
+  theme_map() +
+  theme(legend.position = "bottom") +
+  guides(
+    colour = guide_legend(title = element_blank(), nrow = 4,
+                          override.aes = list(size=1.5))
+  )
+
+ggsave(here::here("figures/presentation_examples/quebec_ecoregion_points.jpeg"))
 ```
 
