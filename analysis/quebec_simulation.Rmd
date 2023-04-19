@@ -98,7 +98,7 @@ usethis::use_data(samplesize_sim)
 How many points are in each ecoregion? Exclude ecoregions with very few points
 ```{r}
 inc_ecoreg_pts <- ecoreg_pts %>% 
-  count(ECO_NUM) %>%
+  count(ECO_ID) %>%
   filter(n > 10)
 ```
 
@@ -111,8 +111,8 @@ ecoreg_qc$AREA <- st_area(ecoreg_qc)
 #https://stackoverflow.com/questions/69539592/calculate-the-surface-area-of-a-variable-in-a-shapefile-in-r#:~:text=Load%20your%20multipolygon%20in%20R,(row)%20in%20your%20multipolygon.&text=%3E%20df2,%3D%20%22id%22%2C%20all.
 
 ecoreg_areas <- ecoreg_qc %>% 
-  filter(ECO_NUM %in% ecoreg_pts$ECO_NUM) %>% #exclude regions with too few points
-  group_by(ECO_NUM) %>% 
+  filter(ECO_ID %in% ecoreg_pts$ECO_ID) %>% #exclude regions with too few points
+  group_by(ECO_ID) %>% 
   summarize(st_union(geometry), 
             area_NAME = sum(AREA)) %>%
   mutate(PERC_AREA = area_NAME/sum(area_NAME))
@@ -122,18 +122,18 @@ ecoreg_areas <- ecoreg_qc %>%
 Format ecoregion and point data
 ```{r}
 ecoregion_points_data <- ecoreg_pts %>% 
-  filter(ECO_NUM %in% inc_ecoreg_pts$ECO_NUM) %>% #exclude ecoregions with too few points
+  filter(ECO_ID %in% inc_ecoreg_pts$ECO_ID) %>% #exclude ecoregions with too few points
   arrange(id) %>%
   left_join(ecoreg_areas %>%
               st_drop_geometry() %>%
-              select(ECO_NUM, PERC_AREA))
+              select(ECO_ID, PERC_AREA))
 
 usethis::use_data(ecoregion_points_data)
 ```
 
 ```{r}
 # test <- purrr::map_dfr(sample_sizes[1:2], ~get_strata_reps(.x, strat_df = inc_pts,
-#                                                    nreps = 2, strata_col = ECO_NUM, area_col = PERC_AREA) %>% mutate(sample_size = .x))
+#                                                    nreps = 2, strata_col = ECO_ID, area_col = PERC_AREA) %>% mutate(sample_size = .x))
 
 
 source(here::here("R/get_eqprob_strat.R"))
@@ -141,7 +141,7 @@ source(here::here("R/get_eqprob_strat.R"))
 plan("multisession", workers = length(sample_sizes))
 strata_sim <- furrr::future_map(sample_sizes, 
                                         ~get_strata_reps(.x, strat_df = ecoregion_points_data, 
-                                                    nreps = repn, strata_col = ECO_NUM, area_col = PERC_AREA), 
+                                                    nreps = repn, strata_col = ECO_ID, area_col = PERC_AREA), 
                                         .options = furrr_options(seed = TRUE))
 
 ecoregion_inc_prob <- purrr::map_dfr(strata_sim, 2)
@@ -151,14 +151,6 @@ strata_sim_points <- purrr::map_dfr(strata_sim, 1) %>%
 usethis::use_data(strata_sim_points)
 usethis::use_data(ecoregion_inc_prob)
 ```
-## Simulate latitude bands
-
-```{r}
-# number of latitude bands
-
-```
-
-
 Function for plotting a single rep against the shapefile
 ```{r}
 

@@ -5,23 +5,28 @@
 #' @param pik vector of inclusion probabilities
 #' @param n sample size
 #' @param strata_n named list of samples for each stratum
+#' @param strata_col unquoted column name for strata labels
 #'
 #' @return returns a dataframe of points for each algorithm
-get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n){
+get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n, strata_col){
+
+  strata_col_string <- select(pt_df, {{strata_col}}) %>%
+    st_drop_geometry() %>%
+    colnames()
 
   #simple random sampling stratified
-  srs <- sampling::strata(data = pt_df %>% arrange(ECO_NUM), stratanames = c("ECO_NUM"),
+  srs <- sampling::strata(data = pt_df %>% arrange({{strata_col}}), stratanames = c(strata_col_string),
                           size = strata_n, method = "srswr")
 
   # GRTS
-  grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = "ECO_NUM")
+  grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = strata_col_string)
 
   # CUBE
-  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pt_df$ECO_NUM)
+  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
 
   # SCPS
   scps_strat <- pt_df %>%
-    group_by(ECO_NUM) %>%
+    group_by({{strata_col}}) %>%
     group_map(~{
       prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
@@ -30,7 +35,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n){
     }) %>% unlist()
 
   lpm1_strat <- pt_df %>%
-    group_by(ECO_NUM) %>%
+    group_by({{strata_col}}) %>%
     group_map(~{
       prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
@@ -39,7 +44,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n){
     }) %>% unlist()
 
   lpm2_strat <- pt_df %>%
-    group_by(ECO_NUM) %>%
+    group_by({{strata_col}}) %>%
     group_map(~{
       prob <- .x$inc_prob
       x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
@@ -81,7 +86,7 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
     left_join(stratum_counts) %>%
     mutate(inc_prob = sample_size/stratumN) # calculate inclusion probabilities, N here is N_stratum, all potential points within a stratum, not total N
 
-  # add inclusion probabilites and sample sizes back to the original dataframe
+  # add inclusion probabilities and sample sizes back to the original dataframe
   ecoregion_pts <- strat_df %>%
     left_join(prop_samp %>%
                 select(-{{area_col}}) %>%
@@ -101,7 +106,7 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
     warning(paste0("There are ", dim(missing_ecoregion)[1], " ecoregions that have not been allocated any samples for sample size ", n, "."))
 
     inc_ecoreg_pts <- ecoregion_pts %>%
-      filter(!ECO_NUM %in% missing_ecoregion$ECO_NUM)
+      filter(!{{strata_col}} %in% pull(missing_ecoregion, {{strata_col}}))
 
     strata_df <- filter(strata_df, sample_size != 0)
   } else inc_ecoreg_pts <- ecoregion_pts
@@ -110,7 +115,7 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
 
   # named list of sample sizes
   strata_n <- strata_df %>%
-    arrange(ECO_NUM) %>%
+    arrange({{strata_col}}) %>%
     tibble::deframe()
 
   # vector of inclusion probabilities
@@ -128,7 +133,7 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
                  function(rep) {
                    #pt_df, pt_mat, pik, n, N, strata_n
                    get_eqprob_strat(pt_df = inc_ecoreg_pts, pt_mat = pt_mat, pik = pik,
-                                    n = n, strata_n = strata_n) %>%
+                                    n = n, strata_n = strata_n, strata_col = {{strata_col}}) %>%
                      mutate(rep = rep)
                  }) %>% mutate(sample_size = n)
 

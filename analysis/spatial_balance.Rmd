@@ -40,7 +40,7 @@ dist_mat <- as.matrix(dist(qc_cand_points %>%
                              dplyr::mutate(lon = sf::st_coordinates(.)[,1], 
                                            lat = sf::st_coordinates(.)[,2]) %>%
                              as_tibble() %>%
-                             select(-x)))
+                             select(-x, -id)))
 
 # This calculates inclusion probabilities and spatial balance metric for an equal probability study design
 sb_eqprob <- samplesize_sim %>%
