@@ -20,7 +20,7 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
   # GRTS
   grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = strata_col_string)
 
-  if(is.null(aux_df)){
+
 
     # CUBE
     # matrix of coordinates
@@ -56,7 +56,8 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
 
         return(BalancedSampling::lpm2(prob, x))
       }) %>% unlist()
-  } else{
+
+    if(!is.null(aux_df)){
 
     pt_df_aux <- pt_df %>%
       mutate(lat = sf::st_coordinates(pt_df)[,1],
@@ -67,11 +68,11 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
 
     # CUBE
     # matrix of coordinates
-    cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
+    cube_strat_aux <- BalancedSampling::cubestratified(prob = pik, Xbal = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
                                                    integerStrata = pull(pt_df, {{strata_col}}))
 
     # SCPS
-    scps_strat <- pt_df_aux %>%
+    scps_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
@@ -80,7 +81,7 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
         return(BalancedSampling::scps(prob, x))
       }) %>% unlist()
 
-    lpm1_strat <- pt_df_aux %>%
+    lpm1_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
@@ -89,7 +90,7 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
         return(BalancedSampling::lpm1(prob, x))
       }) %>% unlist()
 
-    lpm2_strat <- pt_df_aux %>%
+    lpm2_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
@@ -98,14 +99,28 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
         return(BalancedSampling::lpm2(prob, x))
       }) %>% unlist()
 
+    results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id,
+                    cube = which(cube_strat == 1), scps = scps_strat,
+                    lpm1 = lpm1_strat, lpm2 = lpm2_strat,
+                    cube_aux = which(cube_strat_aux == 1), scps_aux = scps_strat_aux,
+                    lpm1_aux = lpm1_strat_aux, lpm2_aux = lpm2_strat_aux) %>%
+      map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
+      rename(tempid = `.x`) %>%
+      left_join(pt_df) %>%
+      select(-tempid)
+
+    return(results)
+
   }
 
-  list(srs = srs$ID_unit, grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
+  results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
        scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
     rename(tempid = `.x`) %>%
     left_join(pt_df) %>%
     select(-tempid)
+
+  return(results)
 }
 
 #' Simulate stratified equal probability reps
