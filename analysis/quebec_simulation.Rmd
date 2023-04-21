@@ -167,3 +167,22 @@ plot_design <- function(data, id){
 }
 ```
 
+### Using Environmental data as auxillary variables
+```{r}
+load(here::here("data/env_pts_data.rda"))
+
+env_aux <- env_pts_data %>%
+  st_drop_geometry() %>%
+  select(-ID, -x, -starts_with(c("silvis", "ghmts")))
+
+env_red <- whitening::whiten(as.matrix(env_aux), method="PCA-cor") %>%
+  as_tibble() %>%
+  mutate(id = row_number())
+
+eqprob_aux <- map_dfr(sample_sizes, ~get_eqprop_reps(.x, N = N, pt_df = qc_cand_points, nreps = repn, aux_df = env_red) %>% 
+                                          mutate(sample_size = .x))
+
+eqprob_strata_aux <- map(sample_sizes[1:3], ~get_strata_reps(.x, strat_df = ecoregion_points_data, 
+                                   nreps = repn, strata_col = ECO_ID, area_col = PERC_AREA, aux_df = env_red))
+```
+

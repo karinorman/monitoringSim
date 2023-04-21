@@ -1,14 +1,13 @@
 #' Equal probability monitoring networks with stratification
 #'
 #' @param pt_df sf dataframe of potential sample points
-#' @param pt_mat matrix of point coordinates from `pt_mat`
 #' @param pik vector of inclusion probabilities
 #' @param n sample size
 #' @param strata_n named list of samples for each stratum
 #' @param strata_col unquoted column name for strata labels
 #'
 #' @return returns a dataframe of points for each algorithm
-get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n, strata_col){
+get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
 
   strata_col_string <- select(pt_df, {{strata_col}}) %>%
     st_drop_geometry() %>%
@@ -21,36 +20,85 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n, strata_col){
   # GRTS
   grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = strata_col_string)
 
-  # CUBE
-  cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
+  if(is.null(aux_df)){
 
-  # SCPS
-  scps_strat <- pt_df %>%
-    group_by({{strata_col}}) %>%
-    group_map(~{
-      prob <- .x$inc_prob
-      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    # CUBE
+    # matrix of coordinates
+    pt_mat <- as.matrix(cbind(sf::st_coordinates(pt_df)[,1],
+                              sf::st_coordinates(pt_df)[,2]))
 
-      return(BalancedSampling::scps(prob, x))
-    }) %>% unlist()
+    cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
 
-  lpm1_strat <- pt_df %>%
-    group_by({{strata_col}}) %>%
-    group_map(~{
-      prob <- .x$inc_prob
-      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    # SCPS
+    scps_strat <- pt_df %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
 
-      return(BalancedSampling::lpm1(prob, x))
-    }) %>% unlist()
+        return(BalancedSampling::scps(prob, x))
+      }) %>% unlist()
 
-  lpm2_strat <- pt_df %>%
-    group_by({{strata_col}}) %>%
-    group_map(~{
-      prob <- .x$inc_prob
-      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+    lpm1_strat <- pt_df %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
 
-      return(BalancedSampling::lpm2(prob, x))
-    }) %>% unlist()
+        return(BalancedSampling::lpm1(prob, x))
+      }) %>% unlist()
+
+    lpm2_strat <- pt_df %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+
+        return(BalancedSampling::lpm2(prob, x))
+      }) %>% unlist()
+  } else{
+
+    pt_df_aux <- pt_df %>%
+      mutate(lat = sf::st_coordinates(pt_df)[,1],
+             lon = sf::st_coordinates(pt_df)[,2]) %>%
+      st_drop_geometry() %>%
+      #select(lat, lon, id) %>%
+      left_join(aux_df)
+
+    # CUBE
+    # matrix of coordinates
+    cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
+                                                   integerStrata = pull(pt_df, {{strata_col}}))
+
+    # SCPS
+    scps_strat <- pt_df_aux %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
+
+        return(BalancedSampling::scps(prob, x))
+      }) %>% unlist()
+
+    lpm1_strat <- pt_df_aux %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
+
+        return(BalancedSampling::lpm1(prob, x))
+      }) %>% unlist()
+
+    lpm2_strat <- pt_df_aux %>%
+      group_by({{strata_col}}) %>%
+      group_map(~{
+        prob <- .x$inc_prob
+        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
+
+        return(BalancedSampling::lpm2(prob, x))
+      }) %>% unlist()
+
+  }
 
   list(srs = srs$ID_unit, grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
        scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
@@ -67,7 +115,7 @@ get_eqprob_strat <- function(pt_df, pt_mat, pik, n, strata_n, strata_col){
 #' @param nreps number of replicates
 #' @param strata_col unquoted column name for strata labels
 #' @param area_col unqoted column name for the area variable
-get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
+get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col, aux_df = NULL) {
 
   #get count of number of potential points in each stratum (N_stratum)
   stratum_counts <- strat_df %>%
@@ -121,19 +169,15 @@ get_strata_reps <- function(n, strat_df, nreps, strata_col, area_col) {
   # vector of inclusion probabilities
   pik <- inc_ecoreg_pts$inc_prob
 
-  # matrix of coordinates
-  pt_mat <- as.matrix(cbind(sf::st_coordinates(inc_ecoreg_pts)[,1],
-                            sf::st_coordinates(inc_ecoreg_pts)[,2]))
-
   # make sure there's a complete ID column even if we had to drop data
   inc_ecoreg_pts <- inc_ecoreg_pts %>%
     mutate(tempid = row_number())
 
   sim_reps <- purrr::map_dfr(1:nreps,
                  function(rep) {
-                   #pt_df, pt_mat, pik, n, N, strata_n
-                   get_eqprob_strat(pt_df = inc_ecoreg_pts, pt_mat = pt_mat, pik = pik,
-                                    n = n, strata_n = strata_n, strata_col = {{strata_col}}) %>%
+                   get_eqprob_strat(pt_df = inc_ecoreg_pts, pik = pik,
+                                    n = n, strata_n = strata_n, strata_col = {{strata_col}},
+                                    aux_df = aux_df) %>%
                      mutate(rep = rep)
                  }) %>% mutate(sample_size = n)
 
