@@ -54,7 +54,17 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
 
 # Set palette colors and assign to algorithms
 my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
-group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
+#group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
+group_colors <- c("cube" = my_pal[1], "cube_aux" = my_pal[6], "lpm1" = my_pal[3], "lpm1_aux" = my_pal[4], "scps" = my_pal[2], "scps_aux" = my_pal[5])
+
+# plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+#   metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
+#                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+#                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
+#                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
+#                   #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
+#                   exclude_algos = list("", "", "", "", "", "")
+                  )
 
 plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
   metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
@@ -62,7 +72,9 @@ plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_sc
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
                   #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
-                  exclude_algos = list("", "", "", "", "", "")
+                  exclude_algos = list(c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"),
+                                       c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"),
+                                       c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"))
                   )
 
 plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics, color_list = group_colors, axis.title = element_text(size=7))
@@ -73,8 +85,16 @@ plot_join <- plot_grid(plotlist=plot_list, labels = "AUTO", nrow = 3, align = 'v
 ## Get fiddly bits for the grid plot ##
 
 # legend first
+# legend_plot <- metrics %>%
+#     filter(sim_type == "equal_prob") %>%
+#     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+#     geom_line() +
+#     theme_classic() +
+#     theme(axis.title = element_text(size=7)) +
+#   scale_colour_manual(values = group_colors, drop = FALSE)
+
 legend_plot <- metrics %>%
-    filter(sim_type == "equal_prob") %>%
+    filter(sim_type == "equal_prob", !algorithm %in% c("srs", "grts", "lpm2_aux", "lpm2")) %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
@@ -122,5 +142,17 @@ indv_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "s
 
 purrr::pmap(indv_plot_df, plot_metric_curves, data = metrics, 
             color_list = group_colors, axis.title = element_text(size=15), axis.text=element_text(size=10))
+```
+Quick figure for mean species per site
+```{r}
+mean_species_site %>%
+    select(sample_size, algorithm, sim_type, mean_site_species) %>%
+    ggplot(aes(x = sample_size, y = mean_site_species, color = algorithm)) +
+    facet_grid(~sim_type) +
+    geom_line() +
+    labs(y = "mean species per site", x = "sample size") +
+    theme_classic() +
+    #theme(legend.position = "none") +
+    scale_colour_manual(values = group_colors, drop = FALSE)
 ```
 

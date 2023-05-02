@@ -100,4 +100,29 @@ iucn_df <- bind_rows(richness_dfs$samplesize_sim %>% mutate(sim_type = "equal_pr
 usethis::use_data(iucn_df)
 ```
 
+# Distribution of number of species per plot for different algorithms
+```{r}
+species_by_site <- specieslist_long %>%
+  st_drop_geometry() %>%
+  count(x, id)
+
+species_by_site_sim <- strata_sim_points %>%
+  select(simid, algorithm, id, rep, sample_size) %>%
+  mutate(sim_type = "stratified_equal_prob") %>%
+  bind_rows(samplesize_sim %>% mutate(sim_type = "equal_prob")) %>%
+  select(-x) %>%
+  left_join(species_by_site)
+
+mean_species_site <- species_by_site_sim %>%
+  select(-x) %>%
+  group_by(simid, rep, algorithm, sample_size, sim_type) %>%
+  summarize(rep_mean = mean(n, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  group_by(algorithm, sample_size, sim_type) %>% 
+  summarize(mean_site_species = mean(rep_mean, na.rm = TRUE))
+
+usethis::use_data(species_by_site_sim)
+usethis::use_data(mean_species_site)
+```
+
 

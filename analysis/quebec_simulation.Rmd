@@ -166,15 +166,15 @@ usethis::use_data(ecoregion_inc_prob)
 Function for plotting a single rep against the shapefile
 ```{r}
 
-plot_design <- function(data, id){
-  
-  data %>%
-    filter(simid == id) %>%
-    st_as_sf()
-  
-  plot(qc_proj)
-  points(sf::st_coordinates(qc_cand_proj)[,1],
-         sf::st_coordinates(qc_cand_proj)[,2])
-    
-}
+# plot_design <- function(data, id){
+#   
+#   data %>%
+#     filter(simid == id) %>%
+#     st_as_sf()
+#   
+#   plot(qc_proj)
+#   points(sf::st_coordinates(qc_cand_proj)[,1],
+#          sf::st_coordinates(qc_cand_proj)[,2])
+#     
+# }
 ```
