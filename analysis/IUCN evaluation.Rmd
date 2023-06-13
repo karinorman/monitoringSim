@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
 library(sf)
-library(survey)
+#library(survey)
 library(spsurvey)
 library(BalancedSampling)
 library(ggplot2)
@@ -60,6 +60,8 @@ specieslist_long <- mammal_specieslist %>%
   filter(value == TRUE) %>%
   dplyr::select(-value) %>%
   mutate(species = stringr::str_remove(species, pattern = "\\..*"))
+
+usethis::use_data(specieslist_long)
 
 richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_sim_points), ~ {
   design_lists <- .x %>%
@@ -125,4 +127,64 @@ usethis::use_data(species_by_site_sim)
 usethis::use_data(mean_species_site)
 ```
 
+# Calculate alpha and beta diversity of sites
+```{r}
+specieslist_wide <- specieslist_long %>%
+  mutate(abundance = 1) %>%
+  pivot_wider(names_from = species, values_from = abundance, values_fill = 0) 
+
+species_mat <- specieslist_wide %>%
+  st_drop_geometry() %>%
+  dplyr::select(-x, -id)
+
+# get community distance
+library(betapart)
+beta_dist <- beta.pair(species_mat, index.family = "jaccard")$beta.jac
+beta_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(beta_dist), by = NA)) %>%
+  select(-rowname)
+
+colnames(beta_dist_df) = specieslist_wide$id
+beta_dist_df <- beta_dist_df %>%
+  mutate(id = specieslist_wide$id) %>%
+  pivot_longer(-id, names_to = "colid", values_to = "jaccard") %>%
+  filter(!is.na(jaccard))
+  
+
+# get geographic distance
+euc_dist <- st_distance(qc_cand_points %>% filter(id %in% specieslist_wide$id))
+euc_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(euc_dist), by = NA)) %>%
+  select(-rowname)
+
+colnames(euc_dist_df) = specieslist_wide$id
+euc_dist_df <- euc_dist_df %>%
+  mutate(id = specieslist_wide$id) %>%
+  pivot_longer(-id, names_to = "colid", values_to = "euc") %>%
+  filter(!is.na(euc))
+
+dist_df <- left_join(beta_dist_df, euc_dist_df) %>%
+  mutate(euc = as.numeric(euc))
+
+usethis::use_data(dist_df)
+
+# dist_df %>%
+#   ggplot(aes(x = jaccard, y = euc)) +
+#   geom_point()
+
+```
+
+Let's get the plots for a couple simulations (how can we average them?)
+```{r}
+#first let's do one of the random samples
+filter_id <- samplesize_sim %>% filter(algorithm == "srs") %>% pull(simid) %>% .[1]
+inc_pts <- samplesize_sim %>% 
+  filter(simid == filter_id) %>%
+  pull(id)
+
+plot_pts <- dist_df %>% 
+  filter(id %in% inc_pts)
+
+dist_df %>%
+  ggplot(aes(x = jaccard, y = euc)) +
+  geom_point()
+```
 
