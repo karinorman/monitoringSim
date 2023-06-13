@@ -88,3 +88,8 @@ clim_stack <- stack(here::here("data/wc2-5_proj", wc_files))
 
 usethis::use_data(clim_stack)
 #######################
+
+###########################
+# Mask layer for water from ESA lc data #
+############################
+mask <- raster::raster(here::here("data/y2010_class210_binary.tif"))

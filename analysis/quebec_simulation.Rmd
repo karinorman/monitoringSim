@@ -25,6 +25,14 @@ Load Data
 ```{r}
 load(here::here("data/qc.rda"))
 qc_proj <- st_transform(qc, crs = 5070)
+
+#raster of all the water classified land
+mask <- raster::raster(here::here("data/y2010_class210_binary.tif")) %>%
+  raster::projectRaster(crs = 5070)
+
+mask_poly <- rasterToPolygons(mask, function(x){x!=1}) %>%
+  st_as_sf()
+
 ```
 
 Set up simulation for Quebec
