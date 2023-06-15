@@ -1,0 +1,105 @@
+---
+title: "Distance Decay"
+output: html_document
+date: "2023-06-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(betapart)
+
+load(here::here("data/specieslist_long.rda"))
+load(here::here("data/qc_cand_points.rda"))
+```
+
+
+# Calculate alpha and beta diversity of sites
+```{r}
+specieslist_wide <- specieslist_long %>%
+  mutate(abundance = 1) %>%
+  pivot_wider(names_from = species, values_from = abundance, values_fill = 0) 
+
+species_mat <- specieslist_wide %>%
+  st_drop_geometry() %>%
+  dplyr::select(-x, -id)
+
+# get community distance
+beta_dist <- beta.pair(species_mat, index.family = "jaccard")$beta.jac
+beta_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(beta_dist), by = NA)) %>%
+  select(-rowname)
+
+colnames(beta_dist_df) = specieslist_wide$id
+beta_dist_df <- beta_dist_df %>%
+  mutate(id = specieslist_wide$id) %>%
+  pivot_longer(-id, names_to = "colid", values_to = "jaccard") %>%
+  filter(!is.na(jaccard))
+  
+
+# get geographic distance
+geo_dist <- st_distance(qc_cand_points %>% filter(id %in% specieslist_wide$id))
+geo_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(geo_dist), by = NA)) %>%
+  select(-rowname)
+
+colnames(geo_dist_df) = specieslist_wide$id
+geo_dist_df <- geo_dist_df %>%
+  mutate(id = specieslist_wide$id) %>%
+  pivot_longer(-id, names_to = "colid", values_to = "geo") %>%
+  filter(!is.na(geo))
+
+dist_df <- left_join(beta_dist_df, geo_dist_df) %>%
+  mutate(geo = as.numeric(geo))
+
+usethis::use_data(dist_df)
+
+# dist_df %>%
+#   ggplot(aes(x = jaccard, y = geo)) +
+#   geom_point()
+
+```
+
+Let's get the plots for a couple simulations (how can we average them?)
+```{r}
+#first let's do one of the random samples
+filter_id <- samplesize_sim %>% filter(algorithm == "srs") %>% pull(simid) %>% .[1]
+inc_pts <- samplesize_sim %>% 
+  filter(simid == filter_id) %>%
+  pull(id)
+
+plot_pts <- dist_df %>% 
+  filter(id %in% inc_pts, colid %in% inc_pts) 
+
+
+plot_pts %>%
+  ggplot(aes(x = geo, y = 1 - jaccard)) +
+  ylab("Jaccard similarity") +
+  xlab("Geographic distance") +
+  geom_point()
+
+```
+Let's try to estimate the distance decay model
+```{r}
+# # Get the indexes of points included in the simulation
+# inc_indx <- which(specieslist_wide$id %in% inc_pts)
+# 
+# sub_beta_dist <- usedist::dist_subset(beta_dist, inc_indx)
+# sub_geo_dist <- usedist::dist_subset(geo_dist, inc_indx)
+# 
+# est_mod <- decay.model(sub_beta_dist, sub_geo_dist, model.type = "exponential", y.type = "dissimilarities")
+```
+
+# For each rep, fit a glm to the decay and get a slope
+```{r}
+decay_glm <- function(selected_ids){
+  sample_dist <- dist_df %>%
+    filter(id %in% selected_ids, colid %in% selected_ids) 
+  
+  fit <- glm(1-jaccard ~ geo, data = sample_dist)
+  
+  broom::tidy(fit) %>% filter(term == "geo") %>% pull(estimate)
+}
+```
+
