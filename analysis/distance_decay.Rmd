@@ -10,10 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(dplyr)
+library(tidyr)
 library(betapart)
+library(sf)
+library(ggplot2)
 
 load(here::here("data/specieslist_long.rda"))
 load(here::here("data/qc_cand_points.rda"))
+load(here::here("data/samplesize_sim.rda"))
 ```
 
 
@@ -39,10 +43,10 @@ beta_dist_df <- beta_dist_df %>%
   filter(!is.na(jaccard))
   
 
-# get geographic distance
-geo_dist <- st_distance(qc_cand_points %>% filter(id %in% specieslist_wide$id))
-geo_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(geo_dist), by = NA)) %>%
-  select(-rowname)
+# get geographic distance, have to convert to geographic coordinate system first
+geo_dist <- st_distance(qc_cand_points %>% filter(id %in% specieslist_wide$id) %>% st_transform(crs = 4326)) %>%
+  units::set_units(km)
+geo_dist_df <- as_tibble(rstatix::replace_lower_triangle(as.matrix(geo_dist), by = NA))
 
 colnames(geo_dist_df) = specieslist_wide$id
 geo_dist_df <- geo_dist_df %>%
@@ -76,7 +80,7 @@ plot_pts <- dist_df %>%
 plot_pts %>%
   ggplot(aes(x = geo, y = 1 - jaccard)) +
   ylab("Jaccard similarity") +
-  xlab("Geographic distance") +
+  xlab("Distance (km)") +
   geom_point()
 
 ```
@@ -93,13 +97,23 @@ Let's try to estimate the distance decay model
 
 # For each rep, fit a glm to the decay and get a slope
 ```{r}
-decay_glm <- function(selected_ids){
+decay_glm <- function(simid, selected_ids){
   sample_dist <- dist_df %>%
     filter(id %in% selected_ids, colid %in% selected_ids) 
   
   fit <- glm(1-jaccard ~ geo, data = sample_dist)
   
-  broom::tidy(fit) %>% filter(term == "geo") %>% pull(estimate)
+  broom::tidy(fit) %>% 
+    filter(term == "geo") %>% 
+    select(slope = estimate) %>% 
+    mutate(simid = simid)
 }
+
+decay_est <- samplesize_sim %>%
+  #filter(simid %in% unique(samplesize_sim$simid)[1:3]) %>%
+  group_by(simid) %>%
+  group_map(~decay_glm(simid = unique(.x$simid), selected_ids = .x$id), .keep = TRUE) %>%
+  bind_rows() %>%
+  left_join(samplesize_sim %>% st_drop_geometry() %>% select(-id, -x) %>% distinct())
 ```
 
