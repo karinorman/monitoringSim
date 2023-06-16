@@ -127,7 +127,7 @@ plot_grid(plot_join, legend, rel_widths = c(3,.4)) %>%
   # rel_heights values control vertical title margins
   rel_heights = c(0.1, 1))
 
-ggsave2(here::here("figures/sim_evaluation_color.jpeg"), bg = "white")
+ggsave(here::here("figures/sim_evaluation_color.jpeg"), bg = "white")
 ```
 Save plots individually with all axis labels 
 ```{r}
@@ -145,6 +145,8 @@ purrr::pmap(indv_plot_df, plot_metric_curves, data = metrics,
 ```
 Quick figure for mean species per site
 ```{r}
+load(here::here("data/mean_species_site.rda"))
+
 mean_species_site %>%
     select(sample_size, algorithm, sim_type, mean_site_species) %>%
     ggplot(aes(x = sample_size, y = mean_site_species, color = algorithm)) +

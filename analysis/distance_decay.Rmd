@@ -18,6 +18,7 @@ library(ggplot2)
 load(here::here("data/specieslist_long.rda"))
 load(here::here("data/qc_cand_points.rda"))
 load(here::here("data/samplesize_sim.rda"))
+load(here::here("data/strata_sim_points.rda"))
 ```
 
 
@@ -97,7 +98,7 @@ Let's try to estimate the distance decay model
 
 # For each rep, fit a glm to the decay and get a slope
 ```{r}
-decay_glm <- function(simid, selected_ids){
+decay_glm <- function(simid, sim, selected_ids){
   sample_dist <- dist_df %>%
     filter(id %in% selected_ids, colid %in% selected_ids) 
   
@@ -106,14 +107,41 @@ decay_glm <- function(simid, selected_ids){
   broom::tidy(fit) %>% 
     filter(term == "geo") %>% 
     select(slope = estimate) %>% 
-    mutate(simid = simid)
+    mutate(simid = simid, sim_type = sim)
 }
 
-decay_est <- samplesize_sim %>%
+decay_est <- strata_sim_points %>%
+  select(simid, algorithm, id, rep, sample_size) %>%
+  mutate(sim_type = "stratified_equal_prob") %>%
+  bind_rows(samplesize_sim %>% mutate(sim_type = "equal_prob")) %>%
+  select(-x) %>%
   #filter(simid %in% unique(samplesize_sim$simid)[1:3]) %>%
-  group_by(simid) %>%
-  group_map(~decay_glm(simid = unique(.x$simid), selected_ids = .x$id), .keep = TRUE) %>%
+  group_by(simid, sim_type) %>%
+  group_map(~decay_glm(simid = unique(.x$simid), sim = unique(.x$sim_type), selected_ids = .x$id), .keep = TRUE) %>%
   bind_rows() %>%
   left_join(samplesize_sim %>% st_drop_geometry() %>% select(-id, -x) %>% distinct())
+
+mean_decay <- decay_est %>%
+  group_by(algorithm, sample_size, sim_type) %>%
+  summarize(se = sd(slope), slope = mean(slope))
+```
+
+Figure
+```{r}
+my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
+group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
+
+mean_decay %>%
+    select(sample_size, algorithm, slope) %>%
+    filter(algorithm %in% c("cube", "grts", "lpm1", "lpm2", "scps")) %>%
+    ggplot(aes(x = sample_size, y = slope, color = algorithm)) +
+    facet_grid(~sim_type) +
+    geom_line() +
+    labs(y = "Mean decay slope", x = "sample size") +
+    theme_classic() +
+    #theme(legend.position = "none") +
+    scale_colour_manual(values = group_colors, drop = FALSE)
+
+ggsave(here::here("figures/distance_decay_slope.jpeg"), bg = "white")
 ```
 
