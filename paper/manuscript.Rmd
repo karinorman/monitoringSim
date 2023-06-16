@@ -10,53 +10,78 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Framing
 
-Survey design is a fundamental challenge of monitoring ecological status fro conservation, management, and establishing temporal trends. Increasingly we've moved beyond the non-probaballistic sampling (haphazard, expert-chosen, convenience) based on accessiblity or expert opinion to establish sampling frameworks that explicitly consider statisticall inference from the resulting data. Still, the variety of algorithms for survey designs continue to be constrained to a few well known algorithms accessible through R pakcages. Survey design is a challenge for a variety of fields, and development of increasingly sophisticated algorithms is on going. This development presents a significant opportunity for Ecology to expand its toolbox for survey design. Still, the lack of application of algorithms from outside ecology means we do not have good intuition for algorithm selection, and the scenarios for which different algorithms may be most suitable, considering factors such as scale, heterogeneity, sample size, and sampling targets/target variables (e.g. what you want to sample).
+Survey design is a fundamental challenge of monitoring ecological status for conservation and management and establishing temporal trends. Increasingly we've moved beyond the non-probaballistic sampling (haphazard, expert-chosen, convenience) based on accessibility or expert opinion to establish sampling frameworks that explicitly consider statistical inference from the resulting data. Still, the variety of algorithms for survey designs continue to be constrained to a few well known algorithms accessible through R packages. Survey design is a challenge for a variety of fields, and development of increasingly sophisticated algorithms is on going. This development presents a significant opportunity for Ecology to expand its toolbox for survey design. Still, the lack of application of algorithms from outside ecology means we do not have good intuition for algorithm selection, and the scenarios for which different algorithms may be most suitable, considering factors such as scale, heterogeneity, sample size, and sampling targets/target variables (e.g. what you want to sample).
 
-Common algorithms for survey design are simple random sampling ,stratified sampling, GRTS. We found x papers citing each of these. A whole bunch of other algorithms outlined by [Benedetti2017; Benedetti 2015; Kermorvant 2019].
+Common algorithms for survey design are simple random sampling ,stratified sampling, GRTS. A whole bunch of other algorithms outlined by [Benedetti2017; Benedetti 2015; Kermorvant 2019].
 
-# Algorithm Descriptions
-
-- Compare how stratification and auxiliary variables work
-- logisitical pros/cons (i.e. GRTS can oversample to give you potential replacement plots if an original one doesn't work)
-
-## Generalized Random Tessellation Stratified (GRTS)
-Auxiliary variables: Can be used to inform weighting or define stratification, not incorporated in sampling process.
-
-## Cube Sampling
-Auxiliary variables: Sites are chosen as a solution to the "balancing equations", can balance across any variables
-
-## Spatiall Correlated Poisson Sampling
-Auxiliary variables: Include as part of weights, either up front or potentially as a way to condition the next selection based on characteristics of the previous selection.
-
-## Local Pivitol Method
-Auxiliary variables: Use auxillary data as something to balance across, sites are chosen as a function of euclidian distance across the sample space of all variables.
-
-
-Auxillary information can be included to inform inclusion probability (GRTS, SCPS) or as an inherent part of the sampling process (CUBE, LPM)
-
-# Questions 
+# Questions
 
 Implementation Options:
 
-1. Naive algorithms (no enviro variables or strata), how is a) spatial coverage, b) environmental coverage (measured by: sampling density relative to background along gradients, e.g. elevation, precip etc; or multivariate comparison of the sample space based on centroid location or dispersion around the centroid; see Guerin et al 2020); use data like soil, landform, climate
+1.  Naive algorithms (no enviro variables or strata), how is a) spatial coverage, b) environmental coverage (measured by: sampling density relative to background along gradients, e.g. elevation, precip etc; or multivariate comparison of the sample space based on centroid location or dispersion around the centroid; see Guerin et al 2020); use data like soil, landform, climate
 
-2. Stratify by ecoregion
+2.  Stratify by ecoregion
 
-3. condition on environmental variables
+3.  condition on environmental variables
 
 Questions:
 
-1. Does stratification or conditioning perform better for environmental coverage (i.e. GRTS stratified vs cube w/enviro variables)
+1.  Does stratification or conditioning perform better for environmental coverage (i.e. GRTS stratified vs cube w/enviro variables)
 
-2. Is there a mismatch between environmental coverage, species coverage, and spatial balance? use range maps
-- Assumption that better spatial balance of sites = more representative (assuming that there's some degree of spatial correlation in the study area); Gitzen et al Ch 5
+2.  Is there a mismatch between environmental coverage, species coverage, and spatial balance? use range maps
 
-3. Which algorithms perform better at different scales and different kinds of landscapes (i.e. the moving window across a landscape)
-  - first: for naive implementation - which algorithms happen to perform best (and under what scenarios), when you don't have environmental data to input
-  - second: when environmental data has been inputted
+-   Assumption that better spatial balance of sites = more representative (assuming that there's some degree of spatial correlation in the study area); Gitzen et al Ch 5
 
-4. How well do algorithms perform when they have cost restrictions?
+3.  Which algorithms perform better at different scales and different kinds of landscapes (i.e. the moving window across a landscape)
+
+-   first: for naive implementation - which algorithms happen to perform best (and under what scenarios), when you don't have environmental data to input
+-   second: when environmental data has been inputted
+
+4.  How well do algorithms perform when they have cost restrictions?
 
 # Methods
 
+We evaluated the performance of four different point selection algorithms using a simulation approach. We simulated design scenarios common for sampling networks including varying sample sizes and stratification by ecoregion.
+
+-   For each algorithm we simulated 100 potential sampling designs across a range of sample sizes on the log scale (10, 15, 22, 33, 49, 74, 110, 164, 245, 365, 545)
+
+    -   simulations chose points from a suite of potential candidate points. 1000 candidate points were generated evenly spaced across the monitoring extent, points laying in water or ice land cover types (according to ESA landcover data) were excluded as potential sampling sites, leaving x pote.
+
+-   We simulated designs for all of Quebec and designs stratified by ecoregion
+
+    -   We excluded
+
+-   Used environmental data as input where applicable (not for GRTS)
+
+    -   whitening to reduce dimensionality of environmental inputs
+
+-   We
+
+## Algorithm Descriptions
+
+-   Compare how stratification and auxiliary variables work
+-   logistical pros/cons (i.e. GRTS can oversample to give you potential replacement plots if an original one doesn't work)
+
+### Generalized Random Tessellation Stratified (GRTS)
+
+Auxiliary variables: Can be used to inform weighting or define stratification, not incorporated in sampling process.
+
+### Cube Sampling
+
+Auxiliary variables: Sites are chosen as a solution to the "balancing equations", can balance across any variables
+
+### Spatiall Correlated Poisson Sampling
+
+Auxiliary variables: Included as a variable alongside coordinates as something to get distance spread across [@Zhao2020]
+
+### Local Pivitol Method
+
+Auxiliary variables: Use auxillary data as something to balance across, sites are chosen as a function of euclidian distance across the sample space of all variables.
+
+Explain for each method: - Auxillary information can be included to inform inclusion probability (GRTS) or as an inherent part of the sampling process (CUBE, LPM, SCPS) - spatially explicit or not?
+
 Inclusion probabilities are from Benedetti 2015 textbook
+
+## Algorithm Evaluation
+
+## Data
