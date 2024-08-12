@@ -52,6 +52,12 @@ sample_sizes <- round(exp(log_samp))
 # to get more candidate points (increase N), larger pt_density 
 # qc_cand_points <- get_cand_points(qc_proj, n, pt_density = 100)
 
+# calculate distance between each point's closest neighbor, it's ~13 km
+# st_distance(qc_cand_points) %>%
+#   as.data.frame() %>%
+#   units::drop_units() %>%
+#   mutate(across(everything(), ~min(.x[.x > 0]))) 
+
 usethis::use_data(qc_cand_points)
 ```
 
