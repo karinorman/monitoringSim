@@ -8,118 +8,163 @@
 #'
 #' @return returns a dataframe of points for each algorithm
 get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
-
+  
   strata_col_string <- select(pt_df, {{strata_col}}) %>%
     st_drop_geometry() %>%
     colnames()
-
+  
   #simple random sampling stratified
-  srs <- sampling::strata(data = pt_df %>% arrange({{strata_col}}), stratanames = c(strata_col_string),
-                          size = strata_n, method = "srswr")
-
+  srs <- sampling::strata(data = pt_df %>% select({{strata_col}}, id) %>% arrange({{strata_col}}), stratanames = c(strata_col_string),
+                          size = strata_n, method = "srswor")
+  
   # GRTS
-  grts_strat <- spsurvey::grts(pt_df, n_base = strata_n, stratum_var = strata_col_string)
-
-
-
-    # CUBE
-    # matrix of coordinates
-    pt_mat <- as.matrix(cbind(sf::st_coordinates(pt_df)[,1],
-                              sf::st_coordinates(pt_df)[,2]))
-
-    cube_strat <- BalancedSampling::cubestratified(prob = pik, Xbal = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
-
-    # SCPS
-    scps_strat <- pt_df %>%
-      group_by({{strata_col}}) %>%
-      group_map(~{
-        prob <- .x$inc_prob
-        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
-
-        return(BalancedSampling::scps(prob, x))
-      }) %>% unlist()
-
-    lpm1_strat <- pt_df %>%
-      group_by({{strata_col}}) %>%
-      group_map(~{
-        prob <- .x$inc_prob
-        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
-
-        return(BalancedSampling::lpm1(prob, x))
-      }) %>% unlist()
-
-    lpm2_strat <- pt_df %>%
-      group_by({{strata_col}}) %>%
-      group_map(~{
-        prob <- .x$inc_prob
-        x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
-
-        return(BalancedSampling::lpm2(prob, x))
-      }) %>% unlist()
-
-    if(!is.null(aux_df)){
-
+  grts_strat <- spsurvey::grts(pt_df %>% select({{strata_col}}), n_base = strata_n, stratum_var = strata_col_string)
+  
+  
+  
+  # CUBE
+  # matrix of coordinates
+  pt_mat <- as.matrix(cbind(sf::st_coordinates(pt_df)[,1],
+                            sf::st_coordinates(pt_df)[,2]))
+  
+  #cube_strat <- BalancedSampling::cubestratified(prob = pik, x = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
+  
+  try_num = 0
+  while(try_num != 100){
+    try_out <- try( BalancedSampling::cubestratified(prob = pik, x = pt_mat, integerStrata = pull(pt_df, {{strata_col}})))
+    
+    if (class(try_out) == "try-error"){
+      try_num <- try_num + 1
+      print(paste("trying sample size", n, ", attempt", try_num))
+    } else {
+      cube_strat <- try_out
+      break
+    }
+  }
+  
+  # SCPS
+  scps_strat <- pt_df %>%
+    group_by({{strata_col}}) %>%
+    group_map(~{
+      prob <- .x$inc_prob
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::scps(prob, x))
+    }) %>% unlist()
+  
+  
+  lpm1_strat <- pt_df %>%
+    group_by({{strata_col}}) %>%
+    group_map(~{
+      prob <- .x$inc_prob
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::lpm1(prob, x))
+    }) %>% unlist()
+  
+  lpm2_strat <- pt_df %>%
+    group_by({{strata_col}}) %>%
+    group_map(~{
+      prob <- .x$inc_prob
+      x <- as.matrix(sf::st_coordinates(.x)[,1], sf::st_coordinates(.x)[,2])
+      
+      return(BalancedSampling::lpm2(prob, x))
+    }) %>% unlist()
+  
+  #SCPS Unequal stratification
+  scps_uneq <- BalancedSampling::scps(pik, pt_mat)
+  
+  #LPM Unequal stratification
+  lpm1_uneq <- BalancedSampling::lpm1(pik, pt_mat)
+  lpm2_uneq <- BalancedSampling::lpm2(pik, pt_mat)
+  
+  if(!is.null(aux_df)){
+    
     pt_df_aux <- pt_df %>%
       mutate(lat = sf::st_coordinates(pt_df)[,1],
              lon = sf::st_coordinates(pt_df)[,2]) %>%
       st_drop_geometry() %>%
       #select(lat, lon, id) %>%
       left_join(aux_df)
-
+    
     # CUBE
     # matrix of coordinates
-    cube_strat_aux <- BalancedSampling::cubestratified(prob = pik, Xbal = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
-                                                   integerStrata = pull(pt_df, {{strata_col}}))
-
+    # cube_strat_aux <- BalancedSampling::cubestratified(prob = pik, x = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
+    #                                                    integerStrata = pull(pt_df, {{strata_col}}))
+    
+    try_num = 0
+    while(try_num != 100){
+      try_out <- try(BalancedSampling::cubestratified(prob = pik, x = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
+                                                      integerStrata = pull(pt_df, {{strata_col}})))
+      if (class(try_out) == "try-error"){
+        try_num <- try_num + 1
+        print(paste("trying sample size", n, ", attempt", try_num))
+      } else {
+        cube_strat_aux <- try_out
+        break
+      }
+    }
     # SCPS
     scps_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
-        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
-
+        x <- as.matrix(select(.x, lat, lon, starts_with("L")))
+        
         return(BalancedSampling::scps(prob, x))
       }) %>% unlist()
-
+    
     lpm1_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
-        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
-
+        x <- as.matrix(select(.x, lat, lon, starts_with("L")))
+        
         return(BalancedSampling::lpm1(prob, x))
       }) %>% unlist()
-
+    
     lpm2_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
       group_map(~{
         prob <- .x$inc_prob
-        x <- as.matrix(select(pt_df_aux, lat, lon, starts_with("L")))
-
+        x <- as.matrix(select(.x, lat, lon, starts_with("L")))
+        
         return(BalancedSampling::lpm2(prob, x))
       }) %>% unlist()
-
+    
+    pt_aux <- select(pt_df_aux, lat, lon, starts_with("L"))
+    
+    #SCPS Unequal stratification
+    scps_uneq_aux <- BalancedSampling::scps(pik, pt_aux)
+    
+    #LPM Unequal stratification
+    lpm1_uneq_aux <- BalancedSampling::lpm1(pik, pt_aux)
+    lpm2_uneq_aux <- BalancedSampling::lpm2(pik, pt_aux)
+    
     results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id,
                     cube = which(cube_strat == 1), scps = scps_strat,
                     lpm1 = lpm1_strat, lpm2 = lpm2_strat,
-                    cube_aux = which(cube_strat_aux == 1), scps_aux = scps_strat_aux,
-                    lpm1_aux = lpm1_strat_aux, lpm2_aux = lpm2_strat_aux) %>%
+                    cube_aux = which(cube_strat_aux == 1), 
+                    scps_aux = scps_strat_aux,
+                    lpm1_aux = lpm1_strat_aux, lpm2_aux = lpm2_strat_aux,
+                    scps_uneq = scps_uneq, lpm1_uneq = lpm1_uneq, lpm2_uneq = lpm2_uneq,
+                    scps_uneq_aux = scps_uneq_aux, lpm1_uneq = lpm1_uneq_aux, lpm2_uneq = lpm2_uneq_aux) %>%
       map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
       rename(tempid = `.x`) %>%
       left_join(pt_df) %>%
       select(-tempid)
-
+    
     return(results)
-
+    
   }
-
+  
   results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id, cube = which(cube_strat == 1),
-       scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
+                  scps = scps_strat, lpm1 = lpm1_strat, lpm2 = lpm2_strat) %>%
     map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
     rename(tempid = `.x`) %>%
     left_join(pt_df) %>%
     select(-tempid)
-
+  
   return(results)
 }
 
