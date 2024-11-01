@@ -54,8 +54,9 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
 
 # Set palette colors and assign to algorithms
 my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
-#group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
-group_colors <- c("cube" = my_pal[1], "cube_aux" = my_pal[6], "lpm1" = my_pal[3], "lpm1_aux" = my_pal[4], "scps" = my_pal[2], "scps_aux" = my_pal[5])
+group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
+aux_colors <- c("cube_aux" = my_pal[1], "lpm1_aux" = my_pal[3], "lpm2_aux" = my_pal[4], "scps_aux" = my_pal[2], "srs" = my_pal[5])
+#group_colors <- c("cube" = my_pal[1], "cube_aux" = my_pal[6], "lpm1" = my_pal[3], "lpm1_aux" = my_pal[4], "scps" = my_pal[2], "scps_aux" = my_pal[5])
 
 # plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
 #   metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
@@ -64,22 +65,25 @@ group_colors <- c("cube" = my_pal[1], "cube_aux" = my_pal[6], "lpm1" = my_pal[3]
 #                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
 #                   #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
 #                   exclude_algos = list("", "", "", "", "", "")
-                  )
+#                  )
+```
 
-plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
-  metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
+Plot for no auxiliary variables 
+```{r}
+noaux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd_scale", "jsd_scale"),
+  #metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
                   #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
-                  exclude_algos = list(c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"),
-                                       c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"),
-                                       c("srs", "grts", "lpm2_aux", "lpm2"), c("srs", "grts", "lpm2_aux", "lpm2"))
+                  exclude_algos = list(c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"),
+                                       c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"),
+                                       c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"))
                   )
 
-plot_list <- purrr::pmap(plot_df, plot_metric_curves, data = metrics, color_list = group_colors, axis.title = element_text(size=7))
+noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metrics, color_list = group_colors, axis.title = element_text(size=7))
 
-plot_join <- plot_grid(plotlist=plot_list, labels = "AUTO", nrow = 3, align = 'vh',
+noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
 
 ## Get fiddly bits for the grid plot ##
@@ -94,12 +98,12 @@ plot_join <- plot_grid(plotlist=plot_list, labels = "AUTO", nrow = 3, align = 'v
 #   scale_colour_manual(values = group_colors, drop = FALSE)
 
 legend_plot <- metrics %>%
-    filter(sim_type == "equal_prob", !algorithm %in% c("srs", "grts", "lpm2_aux", "lpm2")) %>%
+    filter(sim_type == "equal_prob", !algorithm %in% c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux")) %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = group_colors, drop = FALSE)
+  scale_colour_manual(values = group_colors, drop = TRUE)
 
 legend <- get_legend(legend_plot)
 
@@ -122,13 +126,71 @@ col_title2 <- ggdraw() +
 
 # put it all together
 col_title_row <- plot_grid(col_title1, col_title2, ncol = 2)
-plot_grid(plot_join, legend, rel_widths = c(3,.4)) %>%
+noaux <- plot_grid(noaux_plot_join, legend, rel_widths = c(3,.4)) %>%
   plot_grid(col_title_row, .,ncol = 1,
   # rel_heights values control vertical title margins
   rel_heights = c(0.1, 1))
 
-ggsave(here::here("figures/sim_evaluation_color.jpeg"), bg = "white")
+ggsave(here::here("figures/sim_evaluation_noaux.jpeg"), plot = noaux, bg = "white")
 ```
+
+Plot for simulations with auxiliary variables
+```{r}
+aux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+                  type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+                  ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
+                  xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
+                  #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
+                  exclude_algos = list(c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"),
+                                       c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"),
+                                       c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"))
+                  )
+
+aux_plot_list <- purrr::pmap(aux_plot_df, plot_metric_curves, data = metrics, color_list = aux_colors, axis.title = element_text(size=7))
+
+aux_plot_join <- plot_grid(plotlist=aux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
+                       hjust = -1, axis = "l", scale = 0.85)
+
+## Get fiddly bits for the grid plot ##
+
+legend_plot <- metrics %>%
+    filter(sim_type == "equal_prob", algorithm != "grts") %>%
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+    geom_line() +
+    theme_classic() +
+    theme(axis.title = element_text(size=7)) +
+  scale_colour_manual(values = group_colors, drop = TRUE)
+
+legend <- get_legend(legend_plot)
+
+# titles for columns
+col_title1 <- ggdraw() + 
+  draw_label(
+    "Equal Probability",
+    fontface = 'bold',
+    x = 0,
+    hjust = -0.7
+  )
+
+col_title2 <- ggdraw() + 
+  draw_label(
+    "Stratified",
+    fontface = 'bold',
+    x = 0,
+    hjust = -1.3
+  )
+
+# put it all together
+col_title_row <- plot_grid(col_title1, col_title2, ncol = 2)
+aux <- plot_grid(aux_plot_join, legend, rel_widths = c(3,.4)) %>%
+  plot_grid(col_title_row, .,ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1))
+
+ggsave(here::here("figures/sim_evaluation_aux.jpeg"), plot = aux, bg = "white")
+```
+
+
 Save plots individually with all axis labels 
 ```{r}
 paths <- c("iucn_eq.jpeg", "iucn_strat.jpeg", "sb_eq.jpeg", "sb_strat.jpeg", "jsd_eq.jpeg", "jsd_strat.jpeg")
