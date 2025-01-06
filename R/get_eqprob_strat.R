@@ -29,18 +29,18 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
   
   #cube_strat <- BalancedSampling::cubestratified(prob = pik, x = pt_mat, integerStrata = pull(pt_df, {{strata_col}}))
   
-  try_num = 0
-  while(try_num != 100){
-    try_out <- try( BalancedSampling::cubestratified(prob = pik, x = pt_mat, integerStrata = pull(pt_df, {{strata_col}})))
-    
-    if (class(try_out) == "try-error"){
-      try_num <- try_num + 1
-      print(paste("trying sample size", n, ", attempt", try_num))
-    } else {
-      cube_strat <- try_out
-      break
-    }
-  }
+  # try_num = 0
+  # while(try_num != 500){
+  #   try_out <- try( BalancedSampling::cubestratified(prob = pik, x = pt_mat, integerStrata = pull(pt_df, {{strata_col}})))
+  #   
+  #   if (class(try_out) == "try-error"){
+  #     try_num <- try_num + 1
+  #     print(paste("trying sample size", n, ", attempt", try_num))
+  #   } else {
+  #     cube_strat <- try_out
+  #     break
+  #   }
+  # }
   
   # SCPS
   scps_strat <- pt_df %>%
@@ -92,18 +92,18 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
     # cube_strat_aux <- BalancedSampling::cubestratified(prob = pik, x = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
     #                                                    integerStrata = pull(pt_df, {{strata_col}}))
     
-    try_num = 0
-    while(try_num != 100){
-      try_out <- try(BalancedSampling::cubestratified(prob = pik, x = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
-                                                      integerStrata = pull(pt_df, {{strata_col}})))
-      if (class(try_out) == "try-error"){
-        try_num <- try_num + 1
-        print(paste("trying sample size", n, ", attempt", try_num))
-      } else {
-        cube_strat_aux <- try_out
-        break
-      }
-    }
+    # try_num = 0
+    # while(try_num != 500){
+    #   try_out <- try(BalancedSampling::cubestratified(prob = pik, x = as.matrix(select(pt_df_aux, lat, lon, starts_with("L"))),
+    #                                                   integerStrata = pull(pt_df, {{strata_col}})))
+    #   if (class(try_out) == "try-error"){
+    #     try_num <- try_num + 1
+    #     print(paste("trying sample size", n, ", attempt", try_num))
+    #   } else {
+    #     cube_strat_aux <- try_out
+    #     break
+    #   }
+    # }
     # SCPS
     scps_strat_aux <- pt_df_aux %>%
       group_by({{strata_col}}) %>%
@@ -142,13 +142,14 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
     lpm2_uneq_aux <- BalancedSampling::lpm2(pik, pt_aux)
     
     results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id,
-                    cube = which(cube_strat == 1), scps = scps_strat,
+                    #cube = which(cube_strat == 1), 
+                    scps = scps_strat,
                     lpm1 = lpm1_strat, lpm2 = lpm2_strat,
-                    cube_aux = which(cube_strat_aux == 1), 
+                    #cube_aux = which(cube_strat_aux == 1), 
                     scps_aux = scps_strat_aux,
                     lpm1_aux = lpm1_strat_aux, lpm2_aux = lpm2_strat_aux,
                     scps_uneq = scps_uneq, lpm1_uneq = lpm1_uneq, lpm2_uneq = lpm2_uneq,
-                    scps_uneq_aux = scps_uneq_aux, lpm1_uneq = lpm1_uneq_aux, lpm2_uneq = lpm2_uneq_aux) %>%
+                    scps_uneq_aux = scps_uneq_aux, lpm1_uneq_aux = lpm1_uneq_aux, lpm2_uneq_aux = lpm2_uneq_aux) %>%
       map_dfr(., ~as.data.frame(.x), .id = "algorithm") %>%
       rename(tempid = `.x`) %>%
       left_join(pt_df) %>%
