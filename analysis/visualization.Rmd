@@ -29,8 +29,21 @@ metrics <- full_join(iucn_df, sb_df) %>%
   # we want all of the metrics between 0 and 1 and decaying 
   mutate(iucn_scale = 1 - (iucn/61), # fraction of species missing
          sb_scale = as.vector(scale(sb,center=min(sb),scale=diff(range(sb)))),
-         jsd_scale = as.vector(scale(jsd,center=min(jsd),scale=diff(range(jsd)))))
-
+         jsd_scale = as.vector(scale(jsd,center=min(jsd),scale=diff(range(jsd))))) %>%
+  tidyr::separate_wider_delim(algorithm, delim = "_", names = c("algorithm", "pt1", "pt2"), too_few = "align_start") %>%
+  mutate(stratified = sim_type == "stratified_equal_prob",
+         aux_vars = case_when(
+           pt1 == "aux" ~ TRUE, 
+           pt2 == "aux" ~ TRUE,
+           .default = FALSE
+         ),
+         inclusion_prob = case_when(pt1 == "uneq" ~ "unequal", 
+                                    .default = "equal"),
+         algorithm_name = case_when(
+           algorithm %in% c("lpm1", "lpm2", "scps") & inclusion_prob == "unequal" ~ paste(algorithm, "unequal"),
+           .default = algorithm
+         )) %>%
+  select(-c(sim_type, pt1, pt2))
 ```
 Function to plot a panel
 ```{r}
@@ -42,8 +55,8 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
     geom_line() +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
-    theme(legend.position = "none", ...) +
-    scale_colour_manual(values = color_list, drop = FALSE)
+    theme(legend.position = "none", ...) #+
+    #scale_colour_manual(values = color_list, drop = FALSE)
   
   if(hasArg(plot_path)) ggsave(plot_path, plot = plot)
   
@@ -98,12 +111,12 @@ noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3
 #   scale_colour_manual(values = group_colors, drop = FALSE)
 
 legend_plot <- metrics %>%
-    filter(sim_type == "equal_prob", !algorithm %in% c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux")) %>%
+    filter(sim_type == "stratified_equal_prob", !algorithm %in% c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux")) %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = group_colors, drop = TRUE)
+    theme(axis.title = element_text(size=7)) #+
+  #scale_colour_manual(values = group_colors, drop = TRUE)
 
 legend <- get_legend(legend_plot)
 
