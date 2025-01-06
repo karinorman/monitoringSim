@@ -43,20 +43,21 @@ metrics <- full_join(iucn_df, sb_df) %>%
            algorithm %in% c("lpm1", "lpm2", "scps") & inclusion_prob == "unequal" ~ paste(algorithm, "unequal"),
            .default = algorithm
          )) %>%
-  select(-c(sim_type, pt1, pt2))
+  select(-c(sim_type, pt1, pt2)) %>%
+  ungroup()
 ```
 Function to plot a panel
 ```{r}
-plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_algos = NULL, color_list, plot_path = NULL, ...){
+plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, aux, exclude_algos = NULL, color_list, plot_path = NULL, ...){
   plot <- data %>%
-    select(sample_size, algorithm, sim_type, !!metric_var) %>%
-    filter(sim_type == type, !algorithm %in% exclude_algos) %>%
-    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm)) +
-    geom_line() +
+    select(sample_size, algorithm_name, stratified, !!metric_var, aux_vars) %>%
+    filter(stratified == type, aux_vars == aux) %>%
+    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm_name)) +
+    geom_line(position = position_dodge(width = 0.002)) +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
-    theme(legend.position = "none", ...) #+
-    #scale_colour_manual(values = color_list, drop = FALSE)
+    theme(legend.position = "none", ...) +
+    scale_colour_manual(values = color_list, drop = FALSE)
   
   if(hasArg(plot_path)) ggsave(plot_path, plot = plot)
   
@@ -66,10 +67,11 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, exclude_a
 #my_pal <- NatParksPalettes::natparks.pals(name="DeathValley",n=6,type="discrete")
 
 # Set palette colors and assign to algorithms
-my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
-group_colors <- c("cube" = my_pal[1], "grts" = my_pal[6], "lpm1" = my_pal[3], "lpm2" = my_pal[4], "scps" = my_pal[2], "srs" = my_pal[5])
-aux_colors <- c("cube_aux" = my_pal[1], "lpm1_aux" = my_pal[3], "lpm2_aux" = my_pal[4], "scps_aux" = my_pal[2], "srs" = my_pal[5])
-#group_colors <- c("cube" = my_pal[1], "cube_aux" = my_pal[6], "lpm1" = my_pal[3], "lpm1_aux" = my_pal[4], "scps" = my_pal[2], "scps_aux" = my_pal[5])
+pal <- khroma::color("light")(9)
+
+#my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
+algo_colors <- c("cube" = pal[1], "grts" = pal[6], "lpm1" = pal[3], "lpm2" = pal[4], "scps" = pal[2], "srs" = "black",
+                 "lpm1 unequal" = pal[5], "lpm2 unequal" = pal[7] , "scps unequal" = pal[8])
 
 # plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
 #   metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
@@ -85,7 +87,7 @@ Plot for no auxiliary variables
 ```{r}
 noaux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd_scale", "jsd_scale"),
   #metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
-                  type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+                  type = rep(c(FALSE, TRUE), 3),
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
                   #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
@@ -94,7 +96,7 @@ noaux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "
                                        c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"))
                   )
 
-noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metrics, color_list = group_colors, axis.title = element_text(size=7))
+noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metrics, aux = FALSE, color_list = algo_colors, axis.title = element_text(size=7))
 
 noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -111,12 +113,12 @@ noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3
 #   scale_colour_manual(values = group_colors, drop = FALSE)
 
 legend_plot <- metrics %>%
-    filter(sim_type == "stratified_equal_prob", !algorithm %in% c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux")) %>%
-    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+    filter(aux_vars == FALSE) %>%
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm_name)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7)) #+
-  #scale_colour_manual(values = group_colors, drop = TRUE)
+    theme(axis.title = element_text(size=7)) +
+  scale_colour_manual(values = algo_colors, drop = TRUE)
 
 legend <- get_legend(legend_plot)
 
