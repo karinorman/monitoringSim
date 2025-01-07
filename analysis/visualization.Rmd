@@ -49,9 +49,18 @@ metrics <- full_join(iucn_df, sb_df) %>%
 Function to plot a panel
 ```{r}
 plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, aux, exclude_algos = NULL, color_list, plot_path = NULL, ...){
-  plot <- data %>%
+  plot_data <- data %>%
     select(sample_size, algorithm_name, stratified, !!metric_var, aux_vars) %>%
-    filter(stratified == type, aux_vars == aux) %>%
+    filter(stratified == type, aux_vars == aux)
+    
+  if (aux == TRUE){
+    plot_data <- plot_data %>%
+      bind_rows(data %>% 
+                  filter(algorithm == "srs", stratified == type) %>% 
+                  select(sample_size, algorithm_name, stratified, !!metric_var, aux_vars))
+  }
+  
+  plot <- plot_data %>% 
     ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm_name)) +
     geom_line(position = position_dodge(width = 0.002)) +
     labs(y = ylabel, x = xlabel) +
@@ -89,11 +98,7 @@ noaux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "
   #metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
                   type = rep(c(FALSE, TRUE), 3),
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
-                  xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
-                  #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
-                  exclude_algos = list(c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"),
-                                       c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"),
-                                       c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"), c("cube_aux", "lpm1_aux", "lpm2_aux", "scps_aux"))
+                  xlabel = c("", "", "", "", "Sample Size", "Sample Size")
                   )
 
 noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metrics, aux = FALSE, color_list = algo_colors, axis.title = element_text(size=7))
@@ -118,7 +123,7 @@ legend_plot <- metrics %>%
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = algo_colors, drop = TRUE)
+  scale_colour_manual(values = algo_colors, drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
@@ -152,16 +157,12 @@ ggsave(here::here("figures/sim_evaluation_noaux.jpeg"), plot = noaux, bg = "whit
 Plot for simulations with auxiliary variables
 ```{r}
 aux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
-                  type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+                  type = rep(c(FALSE, TRUE), 3),
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
-                  xlabel = c("", "", "", "", "Sample Size", "Sample Size"),
-                  #exclude_algos = list("", "", "", list("lpm1", "lpm2", "scps"), "", "")
-                  exclude_algos = list(c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"),
-                                       c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"),
-                                       c("cube", "lpm1", "lpm2", "scps", "grts"), c("cube", "lpm1", "lpm2", "scps", "grts"))
+                  xlabel = c("", "", "", "", "Sample Size", "Sample Size")
                   )
 
-aux_plot_list <- purrr::pmap(aux_plot_df, plot_metric_curves, data = metrics, color_list = aux_colors, axis.title = element_text(size=7))
+aux_plot_list <- purrr::pmap(aux_plot_df, plot_metric_curves, data = metrics, aux = TRUE, color_list = algo_colors, axis.title = element_text(size=7))
 
 aux_plot_join <- plot_grid(plotlist=aux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -169,12 +170,12 @@ aux_plot_join <- plot_grid(plotlist=aux_plot_list, labels = "AUTO", nrow = 3, al
 ## Get fiddly bits for the grid plot ##
 
 legend_plot <- metrics %>%
-    filter(sim_type == "equal_prob", algorithm != "grts") %>%
-    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+  filter(aux_vars == TRUE | algorithm == "srs") %>%
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm_name)) +
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = group_colors, drop = TRUE)
+  scale_colour_manual(values = algo_colors, drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
@@ -208,17 +209,17 @@ ggsave(here::here("figures/sim_evaluation_aux.jpeg"), plot = aux, bg = "white")
 
 Save plots individually with all axis labels 
 ```{r}
-paths <- c("iucn_eq.jpeg", "iucn_strat.jpeg", "sb_eq.jpeg", "sb_strat.jpeg", "jsd_eq.jpeg", "jsd_strat.jpeg")
-indv_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
-                  type = rep(c("equal_prob", "stratified_equal_prob"), 3),
-                  ylabel = c("Percent IUCN Species Missing", "Percent IUCN Species Missing", 
-                             "Mean Spatial Balance", "Mean Spatial Balance", "Mean Divergence", "Mean Divergence"),
-                  xlabel = rep("Sample Size", 6),
-                  plot_path = here::here("figures", paths)
-                  )
-
-purrr::pmap(indv_plot_df, plot_metric_curves, data = metrics, 
-            color_list = group_colors, axis.title = element_text(size=15), axis.text=element_text(size=10))
+# paths <- c("iucn_eq.jpeg", "iucn_strat.jpeg", "sb_eq.jpeg", "sb_strat.jpeg", "jsd_eq.jpeg", "jsd_strat.jpeg")
+# indv_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+#                   type = rep(c("equal_prob", "stratified_equal_prob"), 3),
+#                   ylabel = c("Percent IUCN Species Missing", "Percent IUCN Species Missing", 
+#                              "Mean Spatial Balance", "Mean Spatial Balance", "Mean Divergence", "Mean Divergence"),
+#                   xlabel = rep("Sample Size", 6),
+#                   plot_path = here::here("figures", paths)
+#                   )
+# 
+# purrr::pmap(indv_plot_df, plot_metric_curves, data = metrics, 
+#             color_list = group_colors, axis.title = element_text(size=15), axis.text=element_text(size=10))
 ```
 Quick figure for mean species per site
 ```{r}
