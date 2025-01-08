@@ -98,7 +98,8 @@ richness_dfs <- map(list(samplesize_sim = samplesize_sim, strata_sim = strata_si
 iucn_df <- bind_rows(richness_dfs$samplesize_sim %>% mutate(sim_type = "equal_prob"),
           richness_dfs$strata_sim %>% mutate(sim_type = "stratified_equal_prob")) %>%
   select(-sd) %>%
-  rename(iucn = mean)
+  rename(iucn = mean) %>%
+  ungroup()
 
 usethis::use_data(iucn_df)
 ```

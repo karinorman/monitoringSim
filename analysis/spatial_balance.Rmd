@@ -125,7 +125,8 @@ sb_df <- sb_eqprob %>%
   bind_rows(sb_strat_df %>% mutate(sim_type = "stratified_equal_prob")) %>%
   unnest(sb) %>% 
   group_by(sample_size, algorithm, sim_type) %>%
-  summarize(sb = var(sb), .groups = "keep") 
+  summarize(sb = var(sb), .groups = "keep") %>%
+  ungroup()
 
 usethis::use_data(sb_df)
 ```
