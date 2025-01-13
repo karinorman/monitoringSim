@@ -43,31 +43,43 @@ metrics <- full_join(iucn_df, sb_df) %>%
            algorithm %in% c("lpm1", "lpm2", "scps") & inclusion_prob == "unequal" ~ paste(algorithm, "unequal"),
            .default = algorithm
          )) %>%
-  select(-c(sim_type, pt1, pt2)) %>%
-  ungroup()
+  select(-c(sim_type, pt1, pt2)) 
+
+metric_exc <- metrics %>%
+  tidyr::unite(sim_type, algorithm_name, stratified, remove = FALSE) %>%
+  filter(!sim_type %in% c("lpm1_TRUE", "lpm2_TRUE", "scps_TRUE")) %>%
+  select(-sim_type)
 ```
 Function to plot a panel
 ```{r}
 plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, aux, exclude_algos = NULL, color_list, plot_path = NULL, ...){
   plot_data <- data %>%
-    select(sample_size, algorithm_name, stratified, !!metric_var, aux_vars) %>%
+    select(sample_size, algorithm, stratified, !!metric_var, aux_vars) %>%
     filter(stratified == type, aux_vars == aux)
     
   if (aux == TRUE){
     plot_data <- plot_data %>%
       bind_rows(data %>% 
                   filter(algorithm == "srs", stratified == type) %>% 
-                  select(sample_size, algorithm_name, stratified, !!metric_var, aux_vars))
+                  select(sample_size, algorithm, stratified, !!metric_var, aux_vars))
   }
   
   plot <- plot_data %>% 
-    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm_name)) +
+    ggplot(aes(x = sample_size, y = !!sym(metric_var), color = algorithm)) +
     geom_line(position = position_dodge(width = 0.002)) +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
     theme(legend.position = "none", ...) +
     scale_colour_manual(values = color_list, drop = FALSE)
   
+  # if(metric_var == "sb_scale"){
+  #   plot <- plot + ylim(0,0.007)
+  #   } else if (metric_var == "jsd_scale"){
+  #   plot <- plot + ylim(0, 0.75)
+  #   }else{
+  #   plot <- plot + ylim(0, 0.3)
+  # }
+
   if(hasArg(plot_path)) ggsave(plot_path, plot = plot)
   
   return(plot)
@@ -79,8 +91,10 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, aux, excl
 pal <- khroma::color("light")(9)
 
 #my_pal <- c("#d9be3b", "#77976e", "#086788", "#cc8214", "#bfac88", "#99adbf")
-algo_colors <- c("cube" = pal[1], "grts" = pal[6], "lpm1" = pal[3], "lpm2" = pal[4], "scps" = pal[2], "srs" = "black",
-                 "lpm1 unequal" = pal[5], "lpm2 unequal" = pal[7] , "scps unequal" = pal[8])
+# algo_colors <- c("cube" = pal[1], "grts" = pal[6], "lpm1" = pal[3], "lpm2" = pal[4], "scps" = pal[2], "srs" = "black",
+#                  "lpm1 unequal" = pal[5], "lpm2 unequal" = pal[7] , "scps unequal" = pal[8])
+algo_colors <- c("cube" = pal[1], "grts" = pal[2], "lpm2" = pal[3], "scps" = pal[4], "srs" = "black",
+                 "lpm2 unequal" = pal[5] , "scps unequal" = pal[6])
 
 # plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
 #   metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd", "jsd"),
@@ -94,14 +108,14 @@ algo_colors <- c("cube" = pal[1], "grts" = pal[6], "lpm1" = pal[3], "lpm2" = pal
 
 Plot for no auxiliary variables 
 ```{r}
-noaux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd_scale", "jsd_scale"),
-  #metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
+noaux_plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", "jsd_scale", "jsd_scale"),
+  metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb_scale", "jsd_scale", "jsd_scale"),
                   type = rep(c(FALSE, TRUE), 3),
                   ylabel = c("Percent IUCN Species Missing", "", "Mean Spatial Balance", "", "Mean Divergence", ""),
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size")
                   )
 
-noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metrics, aux = FALSE, color_list = algo_colors, axis.title = element_text(size=7))
+noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metric_exc, aux = FALSE, color_list = algo_colors, axis.title = element_text(size=7))
 
 noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -117,9 +131,9 @@ noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3
 #     theme(axis.title = element_text(size=7)) +
 #   scale_colour_manual(values = group_colors, drop = FALSE)
 
-legend_plot <- metrics %>%
+legend_plot <- metric_exc %>%
     filter(aux_vars == FALSE) %>%
-    ggplot(aes(x = sample_size, y = iucn, color = algorithm_name)) +
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
@@ -162,7 +176,7 @@ aux_plot_df <- tibble(metric_var = c("iucn_scale", "iucn_scale", "sb_scale", "sb
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size")
                   )
 
-aux_plot_list <- purrr::pmap(aux_plot_df, plot_metric_curves, data = metrics, aux = TRUE, color_list = algo_colors, axis.title = element_text(size=7))
+aux_plot_list <- purrr::pmap(aux_plot_df, plot_metric_curves, data = metric_exc, aux = TRUE, color_list = algo_colors, axis.title = element_text(size=7))
 
 aux_plot_join <- plot_grid(plotlist=aux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -204,6 +218,49 @@ aux <- plot_grid(aux_plot_join, legend, rel_widths = c(3,.4)) %>%
   rel_heights = c(0.1, 1))
 
 ggsave(here::here("figures/sim_evaluation_aux.jpeg"), plot = aux, bg = "white", height = 11, width = 11)
+```
+Plot comparing different stratification implementations
+```{r}
+strat_data <- metrics %>% filter(algorithm_name %in% c("lpm2", "scps", "lpm2 unequal", "scps unequal"),
+                                                                                        stratified == TRUE) %>%
+                                 select(-algorithm) %>%
+                                 mutate(algorithm = case_when(
+                                   algorithm_name == "lpm2" ~ "LPM naive",
+                                   algorithm_name == "scps" ~ "SCPS naive",
+                                   algorithm_name == "lpm2 unequal" ~ "LPM unequal",
+                                   algorithm_name == "scps unequal" ~ "SCPS unequal"))
+
+strat_palette <-  c("LPM naive" = pal[1], "LPM unequal" = pal[2], "SCPS naive" = pal[4], "SCPS unequal" = pal[3], "srs" = "black")
+
+strat_comp_df <- tibble(metric_var = c("iucn_scale", "sb_scale", "jsd_scale"),
+                  type = rep(TRUE, 3),
+                  ylabel = c("Percent IUCN Species Missing", "Mean Spatial Balance", "Mean Divergence"),
+                  xlabel = c("", "", "Sample Size")
+                  )
+
+strat_plot_list <- purrr::pmap(strat_comp_df, plot_metric_curves, data = strat_data, 
+                             aux = TRUE, color_list = strat_palette, axis.title = element_text(size=7))
+
+strat_plot_join <- plot_grid(plotlist=strat_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
+                       hjust = -1, axis = "l", scale = 0.85)
+
+legend_plot <- strat_data %>%
+  filter(aux_vars == TRUE | algorithm == "srs") %>%
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+    geom_line() +
+    theme_classic() +
+    theme(axis.title = element_text(size=7)) +
+  scale_colour_manual(values = strat_palette, drop = TRUE, name = "algorithm")
+
+legend <- get_legend(legend_plot)
+
+# put it all together
+strat <- plot_grid(strat_plot_join, legend, rel_widths = c(3,.4)) %>%
+  plot_grid(.,ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1))
+
+ggsave(here::here("figures/strat_comparison.jpeg"), plot = strat, bg = "white", height = 11, width = 6)
 ```
 
 
