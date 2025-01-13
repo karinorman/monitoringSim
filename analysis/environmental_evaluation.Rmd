@@ -86,8 +86,8 @@ usethis::use_data(env_vars_jsd)
 Final df structure
 ```{r}
 jsd_df <- env_vars_jsd %>%
-  tidyr::separate(simid, "_", into = c("rep", "sample_size", "algorithm_type", "aux")) %>%
-  tidyr::unite("algorithm", algorithm_type, aux, sep = "_", na.rm = TRUE) %>% 
+  tidyr::separate(simid, "_", into = c("rep", "sample_size", "algorithm_type", "aux", "extra")) %>%
+  tidyr::unite("algorithm", algorithm_type, aux, extra, sep = "_", na.rm = TRUE) %>% 
   mutate(across(-c(algorithm, sim_type), ~as.numeric(.))) %>%
   group_by(sample_size, algorithm, sim_type) %>%
   summarize(across(-rep, ~mean(sqrt(.x))), .groups = "keep") %>% #take the square root so we actually have JSDistance (not divergence)
