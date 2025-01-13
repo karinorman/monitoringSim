@@ -19,7 +19,7 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
   
   # GRTS
   grts_strat <- spsurvey::grts(pt_df %>% select({{strata_col}}), n_base = strata_n, stratum_var = strata_col_string)
-  
+  grts_strat_id <- which(pt_df$x %in% grts_strat$sites_base$x)
   
   
   # CUBE
@@ -141,7 +141,7 @@ get_eqprob_strat <- function(pt_df, pik, n, strata_n, strata_col, aux_df){
     lpm1_uneq_aux <- BalancedSampling::lpm1(pik, pt_aux)
     lpm2_uneq_aux <- BalancedSampling::lpm2(pik, pt_aux)
     
-    results <- list(srs = srs$ID_unit, grts = grts_strat$sites_base$id,
+    results <- list(srs = srs$ID_unit, grts = grts_strat_id,
                     #cube = which(cube_strat == 1), 
                     scps = scps_strat,
                     lpm1 = lpm1_strat, lpm2 = lpm2_strat,
