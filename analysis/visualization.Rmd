@@ -47,7 +47,7 @@ metrics <- full_join(iucn_df, sb_df) %>%
 
 metric_exc <- metrics %>%
   tidyr::unite(sim_type, algorithm_name, stratified, remove = FALSE) %>%
-  filter(!sim_type %in% c("lpm1_TRUE", "lpm2_TRUE", "scps_TRUE")) %>%
+  filter(!sim_type %in% c("lpm1_TRUE", "lpm2_TRUE", "scps_TRUE", "lpm1 unequal_TRUE", "lpm1_FALSE")) %>%
   select(-sim_type)
 ```
 Function to plot a panel
@@ -115,7 +115,8 @@ noaux_plot_df <- tibble(#metric_var = c("iucn_scale", "iucn_scale", "sb", "sb", 
                   xlabel = c("", "", "", "", "Sample Size", "Sample Size")
                   )
 
-noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metric_exc, aux = FALSE, color_list = algo_colors, axis.title = element_text(size=7))
+noaux_plot_list <- purrr::pmap(noaux_plot_df, plot_metric_curves, data = metric_exc, aux = FALSE, 
+                               color_list = algo_colors, axis.title = element_text(size=7))
 
 noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3, align = 'vh',
                        hjust = -1, axis = "l", scale = 0.85)
@@ -131,13 +132,16 @@ noaux_plot_join <- plot_grid(plotlist=noaux_plot_list, labels = "AUTO", nrow = 3
 #     theme(axis.title = element_text(size=7)) +
 #   scale_colour_manual(values = group_colors, drop = FALSE)
 
+
+labels <- c("Cube", "GRTS", "LPM", "SCPS", "SRS")
+
 legend_plot <- metric_exc %>%
     filter(aux_vars == FALSE) %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = algo_colors, drop = TRUE, name = "algorithm")
+  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
@@ -189,7 +193,7 @@ legend_plot <- metrics %>%
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = algo_colors, drop = TRUE, name = "algorithm")
+  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
