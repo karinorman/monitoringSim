@@ -187,13 +187,14 @@ aux_plot_join <- plot_grid(plotlist=aux_plot_list, labels = "AUTO", nrow = 3, al
 
 ## Get fiddly bits for the grid plot ##
 
-legend_plot <- metrics %>%
-  filter(aux_vars == TRUE | algorithm == "srs") %>%
-    ggplot(aes(x = sample_size, y = iucn, color = algorithm_name)) +
+legend_plot <- metric_exc %>%
+  filter(aux_vars == TRUE, stratified == TRUE) %>%
+  bind_rows(metric_exc %>% filter(algorithm == "srs")) %>%
+    ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
     theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE, name = "algorithm")
+  scale_colour_manual(values = algo_colors, labels = labels[labels != "GRTS"], drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
