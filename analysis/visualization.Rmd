@@ -69,7 +69,7 @@ plot_metric_curves <- function(data, metric_var, type, ylabel, xlabel, aux, excl
     geom_line(position = position_dodge(width = 0.002)) +
     labs(y = ylabel, x = xlabel) +
     theme_classic() +
-    theme(legend.position = "none", ...) +
+    theme(legend.position = "none", legend.title = element_blank(),...) +
     scale_colour_manual(values = color_list, drop = FALSE)
   
   # if(metric_var == "sb_scale"){
@@ -140,8 +140,8 @@ legend_plot <- metric_exc %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7)) +
-  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE, name = "algorithm")
+    theme(axis.title = element_text(size=7), legend.title = element_blank()) +
+  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE)
 
 legend <- get_legend(legend_plot)
 
@@ -193,7 +193,7 @@ legend_plot <- metric_exc %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7)) +
+    theme(axis.title = element_text(size=7), legend.title = element_blank()) +
   scale_colour_manual(values = algo_colors, labels = labels[labels != "GRTS"], drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
@@ -254,18 +254,18 @@ legend_plot <- strat_data %>%
     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
     geom_line() +
     theme_classic() +
-    theme(axis.title = element_text(size=7)) +
+    theme(axis.title = element_text(size=7), legend.title = element_blank()) +
   scale_colour_manual(values = strat_palette, drop = TRUE, name = "algorithm")
 
 legend <- get_legend(legend_plot)
 
 # put it all together
-strat <- plot_grid(strat_plot_join, legend, rel_widths = c(3,.4)) %>%
-  plot_grid(.,ncol = 1,
-  # rel_heights values control vertical title margins
-  rel_heights = c(0.1, 1))
+strat <- plot_grid(strat_plot_join, legend, rel_widths = c(1,.4))# %>%
+  # plot_grid(.,ncol = 1,
+  # # rel_heights values control vertical title margins
+  # rel_heights = c(0.1, 1))
 
-ggsave(here::here("figures/strat_comparison.jpeg"), plot = strat, bg = "white", height = 11, width = 6)
+save_plot(here::here("figures/strat_comparison.jpeg"), plot = strat, bg = "white",ncol = 2, nrow =3, base_asp = 1.1)
 ```
 
 
