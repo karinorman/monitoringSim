@@ -24,8 +24,12 @@ load(here::here("data/jsd_df.rda")) #jensen-shannon divergence averaged across e
 #n_distinct(qc_mammals$binomial)
 # results in 61 total mammals in Quebec
 
-metrics <- full_join(iucn_df, sb_df) %>%
-  full_join(jsd_df) %>%
+nontrans_metrics <- bind_rows(iucn_df, jsd_df) %>%
+  bind_rows(sb_df %>% rename(mean = sb) %>% mutate(metric = "sb")) 
+
+metrics <- nontrans_metrics %>%
+  select(-c(sd, ci_low, ci_high)) %>%
+  tidyr::pivot_wider(names_from = metric, values_from = mean) %>%
   # we want all of the metrics between 0 and 1 and decaying 
   mutate(iucn_scale = 1 - (iucn/61), # fraction of species missing
          sb_scale = as.vector(scale(sb,center=min(sb),scale=diff(range(sb)))),
@@ -296,5 +300,122 @@ mean_species_site %>%
     theme_classic() +
     #theme(legend.position = "none") +
     scale_colour_manual(values = group_colors, drop = FALSE)
+```
+
+Figure for the supplement with error bars 
+```{r}
+ci_data <- nontrans_metrics %>%
+  filter(metric != "sb") %>%
+  tidyr::separate_wider_delim(algorithm, delim = "_", names = c("algorithm", "pt1", "pt2"), too_few = "align_start") %>%
+  mutate(stratified = sim_type == "stratified_equal_prob",
+         aux_vars = case_when(
+           pt1 == "aux" ~ TRUE, 
+           pt2 == "aux" ~ TRUE,
+           .default = FALSE
+         ),
+         inclusion_prob = case_when(pt1 == "uneq" ~ "unequal", 
+                                    .default = "equal"),
+         algorithm_name = case_when(
+           algorithm %in% c("lpm1", "lpm2", "scps") & inclusion_prob == "unequal" ~ paste(algorithm, "unequal"),
+           .default = algorithm
+         )) %>%
+  select(-c(sim_type, pt1, pt2)) %>% 
+  tidyr::unite(sim_type, algorithm_name, stratified, remove = FALSE) %>%
+  filter(!sim_type %in% c("lpm1_TRUE", "lpm2_TRUE", "scps_TRUE", "lpm1 unequal_TRUE", "lpm1_FALSE")) %>%
+  select(-sim_type)
+
+ci_plot_df <- tibble(
+  metric_var = c("iucn", "iucn", "jsd", "jsd"),
+  type = rep(c(FALSE, TRUE), 2),
+  ylabel = c("Percent IUCN Species Missing", "", "Mean Divergence", ""),
+  xlabel = c("", "", "Sample Size", "Sample Size")
+)
+
+ci_plot_list <- purrr::pmap(ci_plot_df, plot_metric_ci, data = ci_data, aux = FALSE, 
+                               color_list = algo_colors, axis.title = element_text(size=7))
+
+
+plot_metric_ci <- function(data, metric_var, type, ylabel, xlabel, aux, exclude_algos = NULL, color_list, plot_path = NULL, ...){
+  plot_data <- data %>%
+    filter(metric == metric_var) %>%
+    select(sample_size, algorithm, stratified, mean, ci_low, ci_high, aux_vars) %>%
+    filter(stratified == type, aux_vars == aux)
+    
+  if (aux == TRUE){
+    plot_data <- plot_data %>%
+      bind_rows(data %>% 
+                  filter(algorithm == "srs", stratified == type) %>% 
+                  select(sample_size, algorithm, stratified, !!metric_var, aux_vars))
+  }
+  
+  plot <- plot_data %>% 
+    ggplot(aes(x = sample_size, y = mean, group = algorithm, color = algorithm, fill = algorithm)) +
+    geom_line(position = position_dodge(width = 0.002)) + 
+    geom_ribbon(aes(ymin=ci_low, ymax=ci_high), alpha=0.2, linetype = 0) +
+    labs(y = ylabel, x = xlabel) +
+    theme_classic() +
+    theme(legend.position = "none", legend.title = element_blank(),...) +
+    scale_colour_manual(values = color_list, drop = FALSE) +
+    scale_fill_manual(values = color_list, drop = FALSE)
+
+  if(hasArg(plot_path)) ggsave(plot_path, plot = plot)
+  
+  return(plot)
+}
+
+ci_plot_join <- plot_grid(plotlist=ci_plot_list, labels = "AUTO", nrow = 2, align = 'vh',
+                       hjust = -1, axis = "l", scale = 0.85)
+
+## Get fiddly bits for the grid plot ##
+
+# legend first
+# legend_plot <- metrics %>%
+#     filter(sim_type == "equal_prob") %>%
+#     ggplot(aes(x = sample_size, y = iucn, color = algorithm)) +
+#     geom_line() +
+#     theme_classic() +
+#     theme(axis.title = element_text(size=7)) +
+#   scale_colour_manual(values = group_colors, drop = FALSE)
+
+
+labels <- c("Cube", "GRTS", "LPM", "SCPS", "SRS")
+
+legend_plot <- ci_data %>%
+    filter(aux_vars == FALSE, metric == "iucn") %>%
+    ggplot(aes(x = sample_size, y = mean, group = algorithm, color = algorithm, fill = algorithm)) +
+    geom_line(position = position_dodge(width = 0.002)) + 
+    geom_ribbon(aes(ymin=ci_low, ymax=ci_high), alpha=0.2, linetype = 0) +
+    theme_classic() +
+    theme(axis.title = element_text(size=7), legend.title = element_blank()) +
+  scale_colour_manual(values = algo_colors, labels = labels, drop = TRUE) +
+  scale_fill_manual(values = algo_colors, labels = labels, drop = TRUE)
+
+legend <- get_legend(legend_plot)
+
+# titles for columns
+col_title1 <- ggdraw() + 
+  draw_label(
+    "Equal Probability",
+    fontface = 'bold',
+    x = 0,
+    hjust = -1
+  )
+
+col_title2 <- ggdraw() + 
+  draw_label(
+    "Stratified",
+    fontface = 'bold',
+    x = 0,
+    hjust = -1.6
+  )
+
+# put it all together
+col_title_row <- plot_grid(col_title1, col_title2, ncol = 2)
+ci_plot_join_annotate <- plot_grid(ci_plot_join, legend, rel_widths = c(3,.4)) %>%
+  plot_grid(col_title_row, .,ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1))
+
+ggsave(here::here("figures/sim_eval_ci.jpg"), plot = ci_plot_join_annotate, bg = "white", height = 8, width = 11)
 ```
 

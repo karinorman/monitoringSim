@@ -94,8 +94,12 @@ jsd_df <- env_vars_jsd %>%
   ungroup() %>%
   pivot_longer(c(everything(), -sample_size, -algorithm, -sim_type), names_to = "env_variable") %>%
   group_by(sample_size, algorithm, sim_type) %>%
-  summarize(jsd = mean(value), .groups = "keep") %>%
-  ungroup()
+  summarize(mean = mean(value), sd = sd(value), .groups = "keep") %>%
+  ungroup() %>%
+  rowwise() %>%
+  mutate(ci_low = mean - ((1.96*sd)/sqrt(100)),
+         ci_high = mean + ((1.96*sd)/sqrt(100)),
+         metric = "jsd")
 
 usethis::use_data(jsd_df)
 ```
