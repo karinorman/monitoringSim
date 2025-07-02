@@ -327,7 +327,7 @@ ci_data <- nontrans_metrics %>%
 ci_plot_df <- tibble(
   metric_var = c("iucn", "iucn", "jsd", "jsd"),
   type = rep(c(FALSE, TRUE), 2),
-  ylabel = c("Percent IUCN Species Missing", "", "Mean Divergence", ""),
+  ylabel = c("Number of IUCN Species Sampled", "", "Mean Divergence", ""),
   xlabel = c("", "", "Sample Size", "Sample Size")
 )
 
